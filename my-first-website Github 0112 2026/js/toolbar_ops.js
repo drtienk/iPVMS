@@ -5,17 +5,15 @@ console.log("✅ [toolbar_ops.js] loaded");
 window.DEFS = window.DEFS || {};
 window.DEFS.TOOLBAR_OPS = window.DEFS.TOOLBAR_OPS || {};
 
-// ✅ GLOBAL shim: 任何人呼叫 _syncDelColBtnVisibility 都不會炸
-if (typeof window._syncDelColBtnVisibility !== "function") {
-  window._syncDelColBtnVisibility = function(){
-    try{
-      const btn = document.getElementById("delColBtn");
-      if (btn) btn.style.display = "";
-    } catch(_e){}
-  };
+// ✅ GLOBAL: 讓任何檔案/任何位置呼叫都不會 ReferenceError
+function _syncDelColBtnVisibility(){
+  try{
+    const btn = document.getElementById("delColBtn");
+    if (btn) btn.style.display = "";
+  } catch(_e){}
 }
-// ✅ legacy name (global identifier)
-var _syncDelColBtnVisibility = window._syncDelColBtnVisibility;
+// 也掛到 window（保險）
+window._syncDelColBtnVisibility = _syncDelColBtnVisibility;
 // ======================= BLOCK: 00_FILE_HEADER END =======================
 
 
@@ -455,6 +453,7 @@ window.DEFS.TOOLBAR_OPS.syncDelColBtnVisibility = _syncDelColBtnVisibility;
 
 
 })();
+
 
 
 
