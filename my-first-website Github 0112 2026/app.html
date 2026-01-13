@@ -429,6 +429,17 @@ SAFE TO REPLACE WHOLE BLOCK
   </div>
   <!-- ========= END BLOCK: 29_UI_MODAL_USER_ADMIN ========= -->
 
+
+  <script>
+  // ✅ GLOBAL SHIM (must be defined before any JS)
+  window._syncDelColBtnVisibility = window._syncDelColBtnVisibility || function(){
+    try{
+      const btn = document.getElementById("delColBtn");
+      if (btn) btn.style.display = "";
+    }catch(e){}
+  };
+</script>
+
 <!-- ======================================
   BLOCK: 90_SCRIPTS_ALL
   AREA: BODY END / all scripts
@@ -529,3 +540,4 @@ SAFE TO REPLACE WHOLE BLOCK
 
 </body>
 </html>
+
