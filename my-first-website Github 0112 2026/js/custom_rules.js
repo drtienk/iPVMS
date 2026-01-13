@@ -77,6 +77,11 @@ console.log("🔥🔥🔥 LOADED custom_rules.js VERSION = 2026-01-13 STEP5-NC-D
 
 console.log("custom_rules.js loaded - v2026-01-10a");
 
+window.CHECKS_BY_SHEET = window.CHECKS_BY_SHEET || {};
+window.CHECKS_BY_SHEET.company = window.CHECKS_BY_SHEET.company || CHECKS_BY_SHEET?.company;
+window.CHECKS_BY_SHEET.ac = window.CHECKS_BY_SHEET.ac || CHECKS_BY_SHEET?.ac;
+window.CHECKS_BY_SHEET.nc = window.CHECKS_BY_SHEET.nc || CHECKS_BY_SHEET?.nc;
+
 
 /* =========================
    A) Actions dropdown binder
