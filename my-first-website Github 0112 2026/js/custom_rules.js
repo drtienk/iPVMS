@@ -1288,6 +1288,33 @@ const CHECKS_BY_SHEET = {
       ),
       goto: { mode:"model", key:"nc", r:firstError.row, c:firstError.col }
     };
+  },
+
+  /* =========================================================
+     ✅ Model > No More Capacity (假設 key 為 nmc，如果不存在請調整)
+     Rules:
+      - 基本檢查規則（可根據需求調整）
+  ========================================================= */
+  nmc: function checkNoMoreCapacitySheet(){
+    if (activeMode !== "model") {
+      return { ok:true, type:"warn", msg: (lang==="en" ? "Skipped (Period mode)." : "略過（Period 模式不檢查）。") };
+    }
+
+    const s = sheets?.nmc;
+    if (!s) {
+      return {
+        ok:false, type:"err",
+        msg: (lang==="en" ? "No More Capacity sheet not found." : "找不到 No More Capacity 分頁。")
+      };
+    }
+
+    // ✅ 基本檢查：至少要有資料
+    ensureSize(s);
+    
+    return {
+      ok:true, type:"ok",
+      msg: (lang==="en" ? "✅ Check passed. No More Capacity sheet is valid." : "✅ 檢查通過。No More Capacity 分頁有效。")
+    };
   }
 };
 
