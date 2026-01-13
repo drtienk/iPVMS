@@ -1499,6 +1499,13 @@ function runChecksForActiveSheet(){
 
   const res = fn();
 
+  // ✅ 臨時診斷：強制彈窗顯示結果（確認 rules 確實被執行）
+  if (res && typeof res === "object") {
+    alert(res.type + "\n" + res.msg);
+  } else {
+    alert("res is not an object: " + typeof res);
+  }
+
   if (!res || res.ok) {
     setCheckStatusForCurrentSheet(
       res?.type || "ok",
