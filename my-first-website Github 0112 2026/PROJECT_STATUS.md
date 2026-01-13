@@ -1,234 +1,399 @@
-login.html              ← 固定入口
-app.html         ← 真正主頁 0109 2026 (原本index_v10_2)
+PROJECT_STATUS.md（2026-01 最新整理版）
 
+目標：
+任何問題 → 30 秒內知道要去哪個 JS 檔改
 
-PROJECT_STATUS.md（建議版本）
 0) 入口頁面（HTML）
 
-login.html ← 固定入口（跳轉/導向用）
+login.html
 
-home.html ← 固定入口（展示/導向用）
+固定入口
 
-login_v1_2.html ← 真正登入頁（2026-01-08）
+只負責登入 → 導向 app.html
 
-index_v10_2.html ← 舊版主頁（2026-01-09，inline 巨檔版本，供比對/回溯用）
+❌ 不放業務邏輯
 
-index.html ← 目前主頁（模組化版本；所有功能以 js/ 為主）
+app.html
 
-1) 系統核心狀態與啟動（不要放業務規則）
+真正主頁（0109 2026）
+
+模組化版本，所有功能都在 js/
+
+<script> 載入順序非常重要
+
+1) 系統核心狀態與啟動（⚠️ 穩定層，不放業務規則）
 js/app_init.js
 
-✅ 負責：啟動流程（restore last tab / load data / apply lang / first render），必須最後載入
+✅ 負責
 
-🛠 常改：啟動順序、第一次 render 時機、F5 後狀態還原
+啟動流程
 
-❌ 不負責：rules、表格互動、tabs 定義
+F5 後狀態還原（mode / tab / period / lang）
+
+🛠 常改
+
+啟動順序
+
+first render 時機
+
+❌ 不負責
+
+rules / tabs / table 行為
 
 js/app.js
 
-✅ 負責：薄殼/委派（delegate）、各模組串接（不應塞業務邏輯）
+✅ 負責
 
-🛠 常改：delegate 接線、ctx 傳遞
+薄殼 / delegate
 
-❌ 不負責：每個分頁的客製規則
+串接所有模組
+
+🛠 常改
+
+delegate 接線
+
+❌ 不放
+
+任何業務邏輯
 
 js/app_state_login.js
 
-✅ 負責：login guard、logout、documentMeta、activeMode/activeKey/activePeriod 等全域 state
+✅ 負責
 
-🛠 常改：登入/登出流程、sessionStorage keys
+login guard / logout
 
-❌ 不負責：tabs/表格/規則
+documentMeta
+
+全域狀態（activeMode / activeKey / activePeriod）
+
+🛠 常改
+
+sessionStorage keys
+
+登入流程
+
+❌ 不負責
+
+tabs / tables / rules
 
 js/app_sheets_core.js
 
-✅ 負責：sheets core wrapper（activeSheet()、apply defs、reset blank、meta helpers）
+✅ 負責
 
-🛠 常改：sheets 初始化策略、meta 結構（如 DAF）
+activeSheet()
 
-❌ 不負責：UI 行為
+套用 sheet defs
+
+meta helpers
+
+🛠 常改
+
+sheets 初始化策略
+
+❌ 不負責
+
+UI 行為 / rules
 
 js/app_mode_storage.js
 
-✅ 負責：mode/period localStorage 存取（save/load、storage key）、header rules（period/daf 特例）
+✅ 負責
 
-🛠 常改：存檔策略、Period 分檔規則、DAF header 規則
+mode / period 的 localStorage
 
-❌ 不負責：分頁客製 rules
+header 特例（period / DAF）
 
-2) 語言 / i18n（跨檔單一真相）
+🛠 常改
+
+存檔策略
+
+Period 分檔規則
+
+❌ 不負責
+
+分頁客製規則
+
+2) 語言 / i18n（單一真相）
 js/i18n_def.js
 
-✅ 負責：字典內容（I18N pack）
+✅ 負責
 
-🛠 常改：新增/修改翻譯文案
+所有翻譯字典
+
+🛠 常改
+
+新增 / 修改文案
 
 js/i18n_role.js
 
-✅ 負責：lang / t / setLang / getRole / isAdmin、角色預設語言、F5 後語言一致
+✅ 負責
 
-🛠 常改：角色預設語言、語言切換後要刷新哪些 UI
+lang / t / setLang
 
-❌ 不負責：tabs 定義、表格渲染
+role（admin / user）
+
+F5 後語言一致
+
+🛠 常改
+
+角色預設語言
+
+語言切換後刷新策略
 
 js/lang_ui.js + js/lang_apply.js
 
-✅ 負責：把 i18n 套到 DOM（topbar/toolbar/period bar）
+✅ 負責
 
-🛠 常改：新增需要翻譯的 DOM 元素
+把 i18n 套到 DOM
 
-3) Tabs（分頁定義與 UI）
+topbar / toolbar / period bar
+
+🛠 常改
+
+新增要翻譯的 UI 元素
+
+3) Tabs（分頁系統）
 js/tabs_def.js
 
-✅ 負責：TAB_CONFIG（所有 sheet key/名稱）、TAB_GROUPS_MODEL / TAB_GROUPS_PERIOD（分組）
+✅ 負責
 
-🛠 常改：新增分頁、改分頁名稱、改分組
+TAB_CONFIG（所有 sheet key / 名稱）
 
-❌ 不負責：表格資料/規則
+MODEL / PERIOD 分組
+
+🛠 最常改
+
+新增分頁
+
+改名稱 / 分組
+
+❌ 不負責
+
+表格 / rules
 
 js/tabs_ui.js
 
-✅ 負責：buildTabs/applyTabUI（畫 tabs、切 activeKey、語言刷新 tabs 文字）
+✅ 負責
 
-🛠 常改：tabs UI 排版、tab label 更新策略
+畫 tabs
+
+切 activeKey
+
+語言刷新 tab label
+
+🛠 常改
+
+tabs UI 排版
 
 js/tabs_ui_wrappers.js
 
-✅ 負責：安全 wrapper / delegate（避免載入順序問題）
+✅ 負責
 
-4) 分頁顯示/隱藏（公司層級）
+安全 wrapper
+
+載入順序保險
+
+🛠 偶爾改
+
+穩定度修正
+
+4) 分頁顯示 / 隱藏（公司層級）
 js/visibility_store.js
 
-✅ 負責：每公司分頁顯示/隱藏、isSheetVisible、ensureActiveKeyVisible
+✅ 負責
 
-🛠 常改：預設顯示策略、periodOnly 規則
+分頁顯示 / 隱藏
 
-❌ 不負責：tabs UI、表格互動
+ensureActiveKeyVisible
+
+🛠 常改
+
+預設顯示策略
+
+periodOnly 規則
 
 js/sheet_admin_ui.js + js/sheet_admin_delegate.js
 
-✅ 負責：分頁管理 modal UI 與事件
+✅ 負責
 
-5) Sheet 定義（每張表的欄位/預設欄數）
+分頁管理 modal
+
+管理事件
+
+5) Sheet 定義（🔥 最重要）
 js/sheets_core_store.js
 
-✅ 負責：MODEL_DEF_MAP / PERIOD_DEF_MAP（每張表 headers、cols）
+✅ 負責
 
-🛠 常改（最重要）：
+MODEL_DEF_MAP
 
-「某分頁加一欄/改欄位名/改欄位順序」→ 改這裡
+PERIOD_DEF_MAP
 
-❌ 不負責：表格渲染、rules
+headers / cols
 
-6) Table 引擎（所有分頁共用）
+🛠 最常改（No.1）
+
+加欄位
+
+改欄位名
+
+改欄位順序
+
+❌ 不負責
+
+render / rules
+
+6) Table 引擎（共用）
 js/table_render_core.js
 
-✅ 負責：render 表格（含 period/daf 多列表頭）
+✅ 負責
 
-🛠 常改：表頭渲染、特殊表（例如 DAF）顯示
+表格 render
+
+多列表頭（period / DAF）
+
+🛠 偶爾改
+
+特殊表顯示
 
 js/table_core.js + js/table_core_bootstrap.js
 
-✅ 負責：ensureSize、headers/cols 管理、bootstrap ctx 連接
+✅ 負責
 
-7) 選取 / 貼上 / Excel-like 操作（共用）
+headers / cols 管理
+
+ctx bootstrap
+
+7) 選取 / 貼上 / Excel-like（你最近常改）
 js/selection_core.js
 
-✅ 負責：selection core、focus cell、與 table 的整合
+✅ 負責
+
+selection state
+
+focus cell
 
 js/selection_events.js
 
-✅ 負責：滑鼠拖曳選取、copy/cut/paste/delete 快捷鍵
+✅ 負責
+
+drag select
+
+copy / cut / paste / undo
+
+🛠 最近常改
+
+Excel 行為修正
 
 8) Toolbar（共用操作）
 js/toolbar_ops.js
 
-✅ 負責：Add Row / Add Column / Export / Clear / Check 等共用操作入口
+✅ 負責
 
-🛠 常改：按鈕行為（但「分頁客製」請放 custom_rules 或分頁專用檔）
+Add Row / Column
+
+Export / Clear / Check
+
+🛠 常改
+
+按鈕行為
 
 js/toolbar_delegate.js
 
-✅ 負責：toolbar delegate / wrapper
+✅ 負責
+
+toolbar wrapper
 
 js/user_added_col_flag.js
 
-✅ 負責：是否新增過欄位（控制 Delete Column 顯示條件）
+✅ 負責
 
-9) Period（Period 列表與 UI）
+是否新增過欄位
+
+控制 Delete Column 顯示
+
+9) Period（Period 列表）
 js/period_store.js
 
-✅ 負責：period list、activePeriod 存取、normalizePeriod
+✅ 負責
+
+period list
+
+activePeriod
+
+normalizePeriod
 
 js/period_ui.js + js/period_ui_delegate.js
 
-✅ 負責：Period bar UI / modal
+✅ 負責
 
-10) Custom Rules（你之後最常改的地方）
+Period bar UI
+
+modal
+
+10) Custom Rules（🔥 你之後最常改）
 js/custom_rules.js
 
-✅ 負責：經常變動的規則集中地（Actions、toolbar 可見性、分頁客製、Checks）
+✅ 負責
 
-🛠 常改：
+所有「會變的規則」集中
 
-CHECKS_BY_SHEET[activeKey]：按 Check 時跑哪張表的規則
+🛠 最常改
 
-特定分頁按鈕（例如 AC Code n、Resource Level n）
+CHECKS_BY_SHEET
 
-必填/鎖定/提示 UI（若屬於單一分頁建議拆出）
+toolbar 可見性
 
-❌ 不負責：table render、selection 行為
+分頁客製行為
 
-已拆出的分頁/規則模組（單一目的）
+❌ 不負責
 
-js/company_row_lock.js：Company 分頁列鎖定（或單列輸入規則）
+table render / selection core
 
-js/model_all_required_company_bu.js：Model 下 company/bu 必填彙整（若有）
+已拆出的單一規則模組
 
-js/required_fields_guide.js：必填欄位提示/導引
+company_row_lock.js
 
-js/required_legend.js：必填欄位 legend
+model_all_required_company_bu.js
 
-js/resource_level_n_buttons.js：Resource - Level n 動態欄位按鈕
+required_fields_guide.js
 
-11) Router wrappers / 其他
+required_legend.js
 
-js/mode_router.js：模式切換（Model/Period）與路由行為
+resource_level_n_buttons.js
 
-js/router_wrappers.js：保穩 wrapper
+👉 單一分頁專用 → 拆成獨立檔
 
-js/user_admin_stub.js：User admin（stub/保留）
+11) Router / 其他
 
-12) Debug（遇到問題先看什麼）
-A) Console anchors（你現在已經有的）
+mode_router.js：Model / Period 切換
+
+router_wrappers.js：保穩 wrapper
+
+user_admin_stub.js：保留 stub
+
+12) Debug 快速定位
+A) Console anchors
 
 ✅ app.js loaded
 
 ✅ [tabs_ui.js] loaded
 
-custom_rules.js loaded - v...
+custom_rules.js loaded - vX
 
 ✅ [01] i18n_role loaded
 
-✅ [02] app_state_login loaded
-
 ✅ [08] app_sheets_core loaded
 
-✅ [09] app_mode_storage loaded
+B) 問題 → 檔案
 
-✅ [CHK] ...（若你之後加 probe 才會有）
+分頁錯 → tabs_def.js
 
-B) 問題定位速查
+欄位錯 → sheets_core_store.js
 
-分頁名稱/分組不對 → tabs_def.js
+F5 跑掉 → app_init.js
 
-欄位 headers/預設欄數不對 → sheets_core_store.js
+語言亂 → i18n_role.js + lang_apply.js
 
-F5 後狀態跑掉 → app_init.js
+Check 沒反應 → custom_rules.js
 
-語言切換不一致 → i18n_role.js + lang_apply.js + tabs_ui.js
-
-Check 沒反應/顯示 no rules → custom_rules.js 的 CHECKS_BY_SHEET
-
-
-貼上/選取怪怪的 → selection_* + table_*
+貼上怪 → selection_* + table_*
