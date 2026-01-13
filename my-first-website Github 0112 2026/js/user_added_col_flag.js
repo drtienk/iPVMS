@@ -5,12 +5,16 @@
   GOAL:
     - When clicking addColBtn => activeSheet().__userAddedCols = true
     - When clicking delColBtn and cols <= minCols => activeSheet().__userAddedCols = false
-  NOTE:
-    - Does NOT touch Activity Center Code n feature
-    - Works even if other modules overwrite functions
+  NEW:
+    - Force delColBtn ALWAYS visible (button may be hidden by other modules)
 ========================================================= */
-(function userAddedColFlag(){
 
+// ======================= BLOCK: 00_WRAPPER_START =======================
+(function userAddedColFlag(){
+// ======================= BLOCK: 00_WRAPPER_END =======================
+
+
+// ======================= BLOCK: 01_FLAG_HELPERS_START =======================
   function setFlagTrue(){
     try{
       if (typeof activeSheet !== "function") return;
@@ -35,8 +39,28 @@
       if (cols <= Number(minCols || 0)) s.__userAddedCols = false;
     } catch {}
   }
+// ======================= BLOCK: 01_FLAG_HELPERS_END =======================
 
+
+// ======================= BLOCK: 02_FORCE_SHOW_DELBTN_START =======================
+  // ✅ Force delColBtn ALWAYS visible (even if other modules hide it)
+  function forceShowDelBtn(){
+    try{
+      const delBtn = document.getElementById("delColBtn");
+      if (!delBtn) return;
+
+      // 永遠顯示，不要再被 display:none 藏掉
+      delBtn.style.display = "";
+    } catch {}
+  }
+// ======================= BLOCK: 02_FORCE_SHOW_DELBTN_END =======================
+
+
+// ======================= BLOCK: 03_BIND_ONCE_START =======================
   function bindOnce(){
+    // ✅ 每次都先把刪欄按鈕拉回來（有人藏就救回來）
+    forceShowDelBtn();
+
     const addBtn = document.getElementById("addColBtn");
     const delBtn = document.getElementById("delColBtn");
 
@@ -54,7 +78,10 @@
       }, true);
     }
   }
+// ======================= BLOCK: 03_BIND_ONCE_END =======================
 
+
+// ======================= BLOCK: 04_BOOT_AND_GUARDS_START =======================
   window.addEventListener("DOMContentLoaded", () => {
     bindOnce();
     setTimeout(bindOnce, 200);
@@ -63,5 +90,9 @@
 
   // guard: toolbar sometimes re-rendered / overwritten
   setInterval(bindOnce, 600);
+// ======================= BLOCK: 04_BOOT_AND_GUARDS_END =======================
 
+
+// ======================= BLOCK: 05_END_START =======================
 })();
+// ======================= BLOCK: 05_END_END =======================
