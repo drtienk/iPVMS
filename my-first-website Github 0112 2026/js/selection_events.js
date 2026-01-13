@@ -164,6 +164,7 @@ window.DEFS.SELECTION_EVENTS = window.DEFS.SELECTION_EVENTS || {};
 
     // =========================================================
     // ✅ TSV helpers for COPY/CUT (FIX: multi-cell copy guaranteed)
+    //    不用 API.selectionToTSV，直接依照 Sel.start/end 讀 DOM
     // =========================================================
     function selectionRect(){
       const s = API.Sel?.start, e = API.Sel?.end;
@@ -284,6 +285,7 @@ window.DEFS.SELECTION_EVENTS = window.DEFS.SELECTION_EVENTS || {};
     // =========================================================
     //  Events
     // =========================================================
+
     document.addEventListener("mousedown", (e) => {
       const gridBody = getGridBody();
       if (!gridBody || !(e.target instanceof Node) || !gridBody.contains(e.target)) return;
@@ -335,7 +337,7 @@ window.DEFS.SELECTION_EVENTS = window.DEFS.SELECTION_EVENTS || {};
       const c = Number(td.dataset.c);
       if (!Number.isFinite(r) || !Number.isFinite(c)) return;
 
-      // ✅ FIX: drag uses setSelection so copy is multi-cell
+      // ✅ FIX #1：拖曳時用 setSelection 同步 API selection（copy 才會是多格）
       const s = API.Sel?.start;
       if (s && Number.isFinite(Number(s.r)) && Number.isFinite(Number(s.c)) && typeof API.setSelection === "function"){
         API.setSelection({ r:Number(s.r), c:Number(s.c) }, { r, c });
@@ -426,6 +428,7 @@ window.DEFS.SELECTION_EVENTS = window.DEFS.SELECTION_EVENTS || {};
       if (window.__CELL_EDIT_MODE) return;
       if (!API.hasSelection?.()) return;
 
+      // ✅ FIX #2：用 DOM 直接組 TSV，保證多格一定會複製到
       const tsv = selectionToTSV_ByDOM();
       if (!tsv) return;
 
