@@ -1524,6 +1524,9 @@ function runChecksForActiveSheet(){
   if (res.goto) gotoCell(res.goto);
 }
 
+// ✅ 暴露到全域，確保 app_init.js 可以存取
+window.runChecksForActiveSheet = runChecksForActiveSheet;
+
 // ✅ 延遲綁定 Check 按鈕，確保 CHECKS_BY_SHEET 已初始化
 (function bindCheckButton(){
   function tryBind(){

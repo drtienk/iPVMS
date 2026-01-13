@@ -70,6 +70,34 @@ console.log("✅ [19] app_init loaded");
       // safety: ensure first paint
       if (typeof window.render === "function") window.render();
 
+      // ====== 8) 強制重新綁定 Check 按鈕（確保 click handler 一定接上） ======
+      setTimeout(function forceBindCheckButton(){
+        const checkBtn = document.getElementById("checkBtn");
+        if (checkBtn) {
+          // 移除所有舊的事件監聽器（使用 cloneNode 技巧）
+          const newBtn = checkBtn.cloneNode(true);
+          checkBtn.parentNode.replaceChild(newBtn, checkBtn);
+          
+          // 強制綁定 onclick（最直接的方式，確保一定執行）
+          newBtn.onclick = function(e){
+            e = e || window.event;
+            if (e) {
+              e.stopPropagation = function(){}; // 不阻止，但提供函數避免錯誤
+            }
+            alert("CHECK CLICKED");
+            if (typeof window.runChecksForActiveSheet === "function") {
+              window.runChecksForActiveSheet();
+            } else {
+              alert("runChecksForActiveSheet not found!");
+            }
+          };
+          
+          console.log("✅ [app_init] Check button force-bound via onclick");
+        } else {
+          console.warn("⚠️ [app_init] checkBtn not found");
+        }
+      }, 500); // 延遲 500ms 確保 DOM 完全準備好
+
     } catch (err) {
       window.showErr?.(err);
     }
