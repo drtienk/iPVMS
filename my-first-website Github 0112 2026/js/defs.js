@@ -1,10 +1,55 @@
 
  console.log("[defs.js] loaded");
 
-
- 
-
-
+/* =========================================================
+  LOAD CHAIN AUDIT: Visible Badge (確保 script 載入可見)
+========================================================= */
+(function createLoadBadge(){
+  function insertBadge(){
+    // 如果已存在，不重複建立
+    if (document.getElementById("loadBadge")) return;
+    
+    const badge = document.createElement("div");
+    badge.id = "loadBadge";
+    const timestamp = new Date().toLocaleTimeString("zh-TW", { hour12: false });
+    badge.style.cssText = `
+      position: fixed;
+      top: 10px;
+      right: 10px;
+      background: #10b981;
+      color: white;
+      padding: 6px 10px;
+      border-radius: 4px;
+      font-size: 11px;
+      font-family: monospace;
+      z-index: 99999;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+      line-height: 1.4;
+    `;
+    badge.textContent = "LOADED: defs.js " + timestamp;
+    
+    if (document.body) {
+      document.body.appendChild(badge);
+    } else {
+      // 如果 body 還沒準備好，延遲插入
+      setTimeout(insertBadge, 10);
+    }
+  }
+  
+  // 立即嘗試插入
+  insertBadge();
+  
+  // 在 DOMContentLoaded 時也插入（確保一定執行）
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", insertBadge);
+  } else {
+    insertBadge();
+  }
+  
+  // 多重保險：延遲插入
+  setTimeout(insertBadge, 0);
+  setTimeout(insertBadge, 100);
+})();
 
 /* =========================================================
   MODULE: 07_SHEET_DEFS
@@ -73,5 +118,4 @@ window.DEFS.PERIOD_DEF_MAP = {
   sd:      { title:"Service Driver", headers:["Business Unit","Customer Code","Product Code","Hours"], cols:4 },
 }; 
 /* ======================= END MODULE: 07_SHEET_DEFS ======================= */
-
 
