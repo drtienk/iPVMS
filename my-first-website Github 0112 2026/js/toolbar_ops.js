@@ -648,18 +648,22 @@ function _syncDelColBtnVisibility(){
       } catch (err) { showErr(err); }
     });
   }
-  // ======================= BLOCK: 03_BIND_TOOLBAR_EVENTS_END =======================
+// ======================= BLOCK: 04_EXPORTS_START =======================
+window.DEFS.TOOLBAR_OPS.bind = bind;
+window.DEFS.TOOLBAR_OPS.bindToolbarEvents = bindToolbarEvents;
 
+// ✅ 防呆：就算你忘了放 _syncDelColBtnVisibility，也不會在載入時 ReferenceError
+var _syncDelColBtnVisibility = function(){
+  try{ _forceShowDelColBtn(); } catch(_e){}
+  try{ _syncFloatingUI(); } catch(_e){}
+};
 
-  // ======================= BLOCK: 04_EXPORTS_START =======================
-  window.DEFS.TOOLBAR_OPS.bind = bind;
-  window.DEFS.TOOLBAR_OPS.bindToolbarEvents = bindToolbarEvents;
+window.DEFS.TOOLBAR_OPS.syncDelColBtnVisibility = _syncDelColBtnVisibility;
+// ======================= BLOCK: 04_EXPORTS_END =======================
 
-  // 給其他模組（例如 paste handler）呼叫用：貼上擴欄後可立刻同步按鈕顯示
-  window.DEFS.TOOLBAR_OPS.syncDelColBtnVisibility = _syncDelColBtnVisibility;
-  // ======================= BLOCK: 04_EXPORTS_END =======================
 
 })();
+
 
 
 
