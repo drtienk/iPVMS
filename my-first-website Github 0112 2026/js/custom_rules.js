@@ -1342,24 +1342,15 @@ function runChecksForActiveSheet(){
   }
 
   // ✅ 確保 activeKey 能正確對應到 CHECKS_BY_SHEET
-  // 優先直接查找，如果找不到且 activeKey 是 "nc"，強制使用 CHECKS.nc
   let fn = null;
   
-  // 先嘗試直接查找
+  // 直接查找對應的檢查函數
   if (CHECKS[activeKey] && typeof CHECKS[activeKey] === "function") {
     fn = CHECKS[activeKey];
   }
-  // ✅ 如果找不到且 activeKey 是 "nc"，強制使用 CHECKS.nc（確保 Normal Capacity 能執行）
-  else if (activeKey === "nc" && CHECKS.nc && typeof CHECKS.nc === "function") {
-    fn = CHECKS.nc;
-  }
   
-  // 如果還是找不到，顯示錯誤（但 Normal Capacity 已在 handler 中處理，這裡不顯示錯誤）
+  // 如果找不到，顯示錯誤
   if (typeof fn !== "function") {
-    // ✅ Normal Capacity (nc) 已在 Check handler 中直接處理，這裡不顯示錯誤
-    if (activeKey === "nc") {
-      return; // 靜默返回，不顯示錯誤訊息
-    }
     setCheckStatusForCurrentSheet(
       "warn",
       "Check",
@@ -1408,43 +1399,8 @@ function runChecksForActiveSheet(){
     if (checkBtn.__checkBound) return true;
     checkBtn.__checkBound = true;
     
-    // ✅ 綁定 Check 按鈕：在 Normal Capacity 分頁直接呼叫 CHECKS_BY_SHEET["nc"]()
+    // ✅ 綁定 Check 按鈕：所有分頁統一使用 runChecksForActiveSheet() 標準流程
     onFn("checkBtn", "click", function(){
-      // ✅ 檢查是否在 Normal Capacity 分頁
-      if (typeof activeKey !== "undefined" && activeKey === "nc") {
-        // ✅ 直接呼叫 window.CHECKS_BY_SHEET["nc"]()
-        const CHECKS = window.CHECKS_BY_SHEET;
-        if (CHECKS && CHECKS.nc && typeof CHECKS.nc === "function") {
-          const res = CHECKS.nc();
-          // ✅ 處理結果並顯示 UI
-          if (res && typeof res === "object") {
-            if (res.ok) {
-              setCheckStatusForCurrentSheet(
-                res.type || "ok",
-                "Check",
-                res.msg || (lang==="en" ? "✅ Check passed." : "✅ 檢查通過。")
-              );
-            } else {
-              setCheckStatusForCurrentSheet(
-                res.type || "err",
-                "Check",
-                res.msg || (lang==="en" ? "⚠️ Check failed." : "⚠️ 檢查未通過。")
-              );
-              if (res.goto && typeof gotoCell === "function") {
-                gotoCell(res.goto);
-              }
-            }
-          } else {
-            setCheckStatusForCurrentSheet(
-              "ok",
-              "Check",
-              (lang==="en" ? "✅ Check passed." : "✅ 檢查通過。")
-            );
-          }
-          return;
-        }
-      }
-      // ✅ 其他分頁使用原本的 runChecksForActiveSheet
       runChecksForActiveSheet();
     });
     return true;
