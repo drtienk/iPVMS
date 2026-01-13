@@ -1337,16 +1337,26 @@ function runChecksForActiveSheet(){
   // ✅ 確保 activeKey 能正確對應到 CHECKS_BY_SHEET
   let fn = CHECKS_BY_SHEET[activeKey];
 
+  // ✅ 如果找不到，檢查是否是 Normal Capacity 的別名，強制對應到 nc
   if (typeof fn !== "function") {
-    setCheckStatusForCurrentSheet(
-      "warn",
-      "Check",
-      (lang==="en"
-        ? `No check rules for this sheet: ${activeKey}`
-        : `此分頁尚未設定檢查規則：${activeKey}`
-      )
-    );
-    return;
+    // ✅ Normal Capacity 的 key 對應表（包含可能的別名）
+    const NORMAL_CAPACITY_KEYS = ["nc", "normal_capacity", "Normal Capacity", "正常產能", "tabNC"];
+    
+    // 檢查 activeKey 是否為 Normal Capacity 的別名
+    if (NORMAL_CAPACITY_KEYS.includes(activeKey) && typeof CHECKS_BY_SHEET.nc === "function") {
+      fn = CHECKS_BY_SHEET.nc;
+    } else {
+      // ✅ 明確列出目前 activeKey 的實際值（用於診斷）
+      setCheckStatusForCurrentSheet(
+        "warn",
+        "Check",
+        (lang==="en"
+          ? `No check rules for this sheet. activeKey="${activeKey}" (type: ${typeof activeKey}). Available keys: ${Object.keys(CHECKS_BY_SHEET).join(", ")}`
+          : `此分頁尚未設定檢查規則。activeKey="${activeKey}" (類型: ${typeof activeKey})。可用 keys: ${Object.keys(CHECKS_BY_SHEET).join(", ")}`
+        )
+      );
+      return;
+    }
   }
 
   const res = fn();
