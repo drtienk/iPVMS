@@ -1,10 +1,15 @@
+// ==================== BLOCK 00_HEADER START ====================
 console.log("✅ [selection_events.js] loaded (UNDO FIX: edit-mode whole-cell undo + ctrlD + cut-guard)");
 
 window.DEFS = window.DEFS || {};
 window.DEFS.SELECTION_EVENTS = window.DEFS.SELECTION_EVENTS || {};
+// ==================== BLOCK 00_HEADER END ====================
 
+
+// ==================== BLOCK 01_INSTALL_WRAPPER START ====================
 (function installSelectionEvents(){
 
+  // ==================== BLOCK 02_TRY_BIND_ONCE START ====================
   function tryBindOnce(){
     const API = window.DEFS?.SELECTION_CORE?.api;
     if (!API) return false;
@@ -12,9 +17,8 @@ window.DEFS.SELECTION_EVENTS = window.DEFS.SELECTION_EVENTS || {};
     if (window.__SELECTION_EVENTS_BINDED__) return true;
     window.__SELECTION_EVENTS_BINDED__ = true;
 
-    // =========================================================
+    // ==================== BLOCK 03_VISUAL_LAYER START ====================
     //  Excel-like Visual Override Layer (black active cell vs blue range)
-    // =========================================================
     const VIS = {
       activeTD: null,
       rangeTDs: [],
@@ -106,10 +110,10 @@ window.DEFS.SELECTION_EVENTS = window.DEFS.SELECTION_EVENTS || {};
       setTimeout(applyExcelVisual, 0);
       setTimeout(applyExcelVisual, 30);
     }
+    // ==================== BLOCK 03_VISUAL_LAYER END ====================
 
-    // =========================================================
-    //  TSV helpers
-    // =========================================================
+
+    // ==================== BLOCK 04_TSV_HELPERS START ====================
     function normalizeClipboardText(s){
       return String(s ?? "").replace(/\r\n/g, "\n").replace(/\r/g, "\n");
     }
@@ -188,10 +192,10 @@ window.DEFS.SELECTION_EVENTS = window.DEFS.SELECTION_EVENTS || {};
       }
       return lines.join("\n");
     }
+    // ==================== BLOCK 04_TSV_HELPERS END ====================
 
-    // =========================================================
-    //  ✅ UNDO stack (paste/delete/cut/ctrl+d + cell edit)
-    // =========================================================
+
+    // ==================== BLOCK 05_UNDO_STACK START ====================
     const HIST = { undo: [], redo: [], max: 200, busy:false };
 
     function pushHist(step){
@@ -253,10 +257,10 @@ window.DEFS.SELECTION_EVENTS = window.DEFS.SELECTION_EVENTS || {};
         HIST.busy = false;
       }, 0);
     }
+    // ==================== BLOCK 05_UNDO_STACK END ====================
 
-    // =========================================================
-    //  Edit helpers (WHOLE-CELL undo in edit mode)
-    // =========================================================
+
+    // ==================== BLOCK 06_EDIT_MODE_WHOLE_CELL_UNDO START ====================
     function placeCaretAtEnd(td){
       try{
         const sel = window.getSelection?.();
@@ -333,9 +337,24 @@ window.DEFS.SELECTION_EVENTS = window.DEFS.SELECTION_EVENTS || {};
       }, 0);
     }
 
+    // ✅ NEW: if edit mode is ON but our EDIT session isn't active (entered by other handler),
+    // rebuild EDIT session from global __EDIT_CELL_KEY
+    function ensureEditSession(){
+      if (EDIT.active) return true;
+      const key = String(window.__EDIT_CELL_KEY || "");
+      if (!key.includes(",")) return false;
+      const parts = key.split(",");
+      const r = Number(parts[0]);
+      const c = Number(parts[1]);
+      if (!Number.isFinite(r) || !Number.isFinite(c)) return false;
+      const td = getTDByRC(r, c);
+      if (!td) return false;
+      return beginEditSession(td);
+    }
+
     // ✅ KEY FIX: whole-cell undo/redo even while editing
     function editModeUndo(){
-      if (!EDIT.active || !Number.isFinite(Number(EDIT.r)) || !Number.isFinite(Number(EDIT.c))) return false;
+      if (!ensureEditSession()) return false;
 
       const r = Number(EDIT.r), c = Number(EDIT.c);
       const before = String(EDIT.before ?? "");
@@ -343,8 +362,8 @@ window.DEFS.SELECTION_EVENTS = window.DEFS.SELECTION_EVENTS || {};
 
       // If nothing changed, still exit edit cleanly
       if (before === after){
-        if (typeof window.exitEditMode === "function") window.exitEditMode();
-        EDIT.active = false;
+        try{ if (typeof window.exitEditMode === "function") window.exitEditMode(); }catch{}
+        EDIT.active = false; EDIT.r = EDIT.c = null; EDIT.td = null; EDIT.before = "";
         return true;
       }
 
@@ -369,6 +388,7 @@ window.DEFS.SELECTION_EVENTS = window.DEFS.SELECTION_EVENTS || {};
     function editModeRedo(){
       const step = HIST.redo.pop();
       if (!step) return false;
+
       // only allow redo when it's the same single-cell kind
       if (!(step && step.rows === 1 && step.cols === 1)) {
         HIST.redo.push(step);
@@ -388,10 +408,10 @@ window.DEFS.SELECTION_EVENTS = window.DEFS.SELECTION_EVENTS || {};
 
       return true;
     }
+    // ==================== BLOCK 06_EDIT_MODE_WHOLE_CELL_UNDO END ====================
 
-    // =========================================================
-    //  Paste (fill selection) + undo
-    // =========================================================
+
+    // ==================== BLOCK 07_PASTE_WITH_UNDO START ====================
     function doPasteTextExcelStyle_WithUndo(text){
       if (!API.hasSelection?.() || !API.Sel?.start) return;
 
@@ -416,10 +436,10 @@ window.DEFS.SELECTION_EVENTS = window.DEFS.SELECTION_EVENTS || {};
         pushHist({ top: rect.top, left: rect.left, rows: rect.rows, cols: rect.cols, beforeTSV, afterTSV });
       }, 0);
     }
+    // ==================== BLOCK 07_PASTE_WITH_UNDO END ====================
 
-    // =========================================================
-    //  Ctrl+D (Fill Down) + undo
-    // =========================================================
+
+    // ==================== BLOCK 08_CTRL_D_FILL_DOWN_WITH_UNDO START ====================
     function fillDownWithUndo(){
       if (!API.hasSelection?.() || !API.Sel?.start) return;
 
@@ -452,10 +472,10 @@ window.DEFS.SELECTION_EVENTS = window.DEFS.SELECTION_EVENTS || {};
 
       setTimeout(afterApply, 0);
     }
+    // ==================== BLOCK 08_CTRL_D_FILL_DOWN_WITH_UNDO END ====================
 
-    // =========================================================
-    //  Drag state
-    // =========================================================
+
+    // ==================== BLOCK 09_DRAG_STATE START ====================
     const DRAG = { down:false, moved:false, downAt:{x:0,y:0} };
     function markDown(e){
       DRAG.down = true;
@@ -471,10 +491,11 @@ window.DEFS.SELECTION_EVENTS = window.DEFS.SELECTION_EVENTS || {};
       const dy = Math.abs((e.clientY || 0) - DRAG.downAt.y);
       return (dx + dy) >= 4;
     }
+    // ==================== BLOCK 09_DRAG_STATE END ====================
 
-    // =========================================================
+
+    // ==================== BLOCK 10_CUT_GUARD START ====================
     //  ✅ CUT GUARD: only clear cells if real Ctrl/⌘+X was pressed
-    // =========================================================
     let __ALLOW_CUT__ = false;
     function armCut(){
       __ALLOW_CUT__ = true;
@@ -483,10 +504,10 @@ window.DEFS.SELECTION_EVENTS = window.DEFS.SELECTION_EVENTS || {};
     function disarmCut(){
       __ALLOW_CUT__ = false;
     }
+    // ==================== BLOCK 10_CUT_GUARD END ====================
 
-    // =========================================================
-    //  Events
-    // =========================================================
+
+    // ==================== BLOCK 11_EVENTS_MOUSE START ====================
     document.addEventListener("mousedown", (e) => {
       const gridBody = getGridBody();
       if (!gridBody || !(e.target instanceof Node) || !gridBody.contains(e.target)) return;
@@ -557,7 +578,7 @@ window.DEFS.SELECTION_EVENTS = window.DEFS.SELECTION_EVENTS || {};
 
     document.addEventListener("dblclick", (e) => {
       const gridBody = getGridBody();
-      if (!gridBody || !(e.target instanceof Node) || !gridBody.contains(e.target)) return;
+      if (!gridBody || !(e.target instanceof Node) || gridBody.contains(e.target) === false) return;
 
       const td = API.getTDFromEventTarget?.(e.target);
       if (!td) return;
@@ -573,7 +594,10 @@ window.DEFS.SELECTION_EVENTS = window.DEFS.SELECTION_EVENTS || {};
 
       enterEditOnTD(td, e);
     }, true);
+    // ==================== BLOCK 11_EVENTS_MOUSE END ====================
 
+
+    // ==================== BLOCK 12_EVENTS_KEYDOWN START ====================
     document.addEventListener("keydown", (e) => {
       const ae = document.activeElement;
       if (ae && (ae.tagName === "INPUT" || ae.tagName === "TEXTAREA")) return;
@@ -666,7 +690,10 @@ window.DEFS.SELECTION_EVENTS = window.DEFS.SELECTION_EVENTS || {};
         return;
       }
     }, true);
+    // ==================== BLOCK 12_EVENTS_KEYDOWN END ====================
 
+
+    // ==================== BLOCK 13_EVENTS_COPY_CUT_PASTE START ====================
     // Copy
     document.addEventListener("copy", (e) => {
       if (window.__CELL_EDIT_MODE) return;
@@ -732,15 +759,22 @@ window.DEFS.SELECTION_EVENTS = window.DEFS.SELECTION_EVENTS || {};
         pushHist({ top: rect.top, left: rect.left, rows: rect.rows, cols: rect.cols, beforeTSV, afterTSV });
       }, 0);
     }, true);
+    // ==================== BLOCK 13_EVENTS_COPY_CUT_PASTE END ====================
 
+
+    // ==================== BLOCK 14_INIT_VISUAL START ====================
     setTimeout(() => {
       safeApplySelectionDOM();
       clearCaret();
     }, 0);
+    // ==================== BLOCK 14_INIT_VISUAL END ====================
 
     return true;
   }
+  // ==================== BLOCK 02_TRY_BIND_ONCE END ====================
 
+
+  // ==================== BLOCK 15_BIND_EXPORT START ====================
   function bind(){
     if (window.__SELECTION_EVENTS_BINDED__) return true;
     if (tryBindOnce()) return true;
@@ -759,5 +793,7 @@ window.DEFS.SELECTION_EVENTS = window.DEFS.SELECTION_EVENTS || {};
   }
 
   window.DEFS.SELECTION_EVENTS.bind = bind;
+  // ==================== BLOCK 15_BIND_EXPORT END ====================
 
 })();
+// ==================== BLOCK 01_INSTALL_WRAPPER END ====================
