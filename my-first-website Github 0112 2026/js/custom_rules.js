@@ -77,10 +77,17 @@ console.log("🔥🔥🔥 LOADED custom_rules.js VERSION = 2026-01-13 STEP5-NC-D
 
 console.log("custom_rules.js loaded - v2026-01-10a");
 
+// ✅ HARD-REGISTER: ensure window.CHECKS_BY_SHEET has keys
 window.CHECKS_BY_SHEET = window.CHECKS_BY_SHEET || {};
-window.CHECKS_BY_SHEET.company = window.CHECKS_BY_SHEET.company || CHECKS_BY_SHEET?.company;
-window.CHECKS_BY_SHEET.ac = window.CHECKS_BY_SHEET.ac || CHECKS_BY_SHEET?.ac;
-window.CHECKS_BY_SHEET.nc = window.CHECKS_BY_SHEET.nc || CHECKS_BY_SHEET?.nc;
+window.CHECKS_BY_SHEET.nc = function checkNormalCapacityDelegate(){
+  const fn = window.DEFS?.CHECKS?.normalCapacity;
+  if (typeof fn !== "function") {
+    return { ok:false, type:"err", msg:(lang==="en"
+      ? "Normal Capacity rule not loaded: window.DEFS.CHECKS.normalCapacity"
+      : "Normal Capacity 規則尚未載入：window.DEFS.CHECKS.normalCapacity") };
+  }
+  return fn();
+};
 
 
 /* =========================
