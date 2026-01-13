@@ -1334,13 +1334,10 @@ function runChecksForActiveSheet(){
     return;
   }
 
-  const fn = CHECKS_BY_SHEET[activeKey];
+  // ✅ 確保 activeKey 能正確對應到 CHECKS_BY_SHEET
+  let fn = CHECKS_BY_SHEET[activeKey];
 
   if (typeof fn !== "function") {
-    // ✅ Debug: 列出所有已註冊的 keys
-    const registeredKeys = Object.keys(CHECKS_BY_SHEET).join(", ");
-    console.warn(`No check rule for activeKey="${activeKey}". Registered keys: ${registeredKeys}`);
-    
     setCheckStatusForCurrentSheet(
       "warn",
       "Check",
