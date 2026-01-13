@@ -12,7 +12,26 @@ console.log('✅ [02] app_state_login loaded');
 (function installAppStateLogin(){
 
   // ✅ config
-  var LOGIN_PAGE = "my-first-website Github 0112 2026/login.html";
+  // ---- Robust login page resolver for GitHub Pages subfolder deployments ----
+  function computeLoginPage(){
+    try{
+      var p = String(location.pathname || "/");
+      // If we are already inside the app folder, "login.html" is correct.
+      if (p.indexOf("/my-first-website%20Github%200112%202026/") >= 0) return "login.html";
+
+      // If we are at repo root (/iPVMS/), we must go into the app folder.
+      if (p.indexOf("/iPVMS/") >= 0) {
+        return "my-first-website%20Github%200112%202026/login.html";
+      }
+
+      // Fallback: use same-folder login
+      return "login.html";
+    }catch(e){
+      return "login.html";
+    }
+  }
+
+  var LOGIN_PAGE = computeLoginPage();
   var ENABLE_AUTO_REDIRECT = false;
 
   // ✅ mode state (GLOBAL)
@@ -104,7 +123,9 @@ console.log('✅ [02] app_state_login loaded');
       ["loggedIn","role","companyId","companyName","activePeriod"].forEach(function(k){
         sessionStorage.removeItem(k);
       });
-      location.href = LOGIN_PAGE;
+
+      // Re-compute in case we're at a different level when clicking logout
+      location.href = computeLoginPage();
     });
 
     console.log("✅ [02] logout bound");
@@ -117,4 +138,3 @@ console.log('✅ [02] app_state_login loaded');
 
 })();
  /* ======================= END MODULE: 02_APP_STATE_LOGIN ======================= */
-
