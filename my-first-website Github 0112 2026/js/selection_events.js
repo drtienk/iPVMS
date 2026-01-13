@@ -1,4 +1,4 @@
-console.log("✅ [selection_events.js] loaded (UNDO + CtrlD + keep copy/paste + CUT-GUARD)");
+console.log("✅ [selection_events.js] loaded (UNDO FIX: edit-mode whole-cell undo + ctrlD + cut-guard)");
 
 window.DEFS = window.DEFS || {};
 window.DEFS.SELECTION_EVENTS = window.DEFS.SELECTION_EVENTS || {};
@@ -190,7 +190,7 @@ window.DEFS.SELECTION_EVENTS = window.DEFS.SELECTION_EVENTS || {};
     }
 
     // =========================================================
-    //  ✅ UNDO stack (paste/delete/cut/ctrl+d + cell edit commit)
+    //  ✅ UNDO stack (paste/delete/cut/ctrl+d + cell edit)
     // =========================================================
     const HIST = { undo: [], redo: [], max: 200, busy:false };
 
@@ -203,9 +203,11 @@ window.DEFS.SELECTION_EVENTS = window.DEFS.SELECTION_EVENTS || {};
     }
 
     function applyTSVAt(top, left, tsv){
+      // Must hit model: pasteTSVAt is the "single source of truth"
       if (typeof API.pasteTSVAt === "function"){
         API.pasteTSVAt(top, left, tsv);
       } else {
+        // fallback
         const mat = parseTSVToMatrix(tsv);
         for (let rr = 0; rr < mat.length; rr++){
           for (let cc = 0; cc < (mat[rr]?.length || 0); cc++){
@@ -214,6 +216,12 @@ window.DEFS.SELECTION_EVENTS = window.DEFS.SELECTION_EVENTS || {};
           }
         }
       }
+    }
+
+    function afterApply(){
+      try{ if (typeof window.render === "function") window.render(); }catch{}
+      safeApplySelectionDOM();
+      clearCaret();
     }
 
     function doUndo(){
@@ -225,9 +233,7 @@ window.DEFS.SELECTION_EVENTS = window.DEFS.SELECTION_EVENTS || {};
       applyTSVAt(step.top, step.left, step.beforeTSV);
 
       setTimeout(() => {
-        try{ if (typeof window.render === "function") window.render(); }catch{}
-        safeApplySelectionDOM();
-        clearCaret();
+        afterApply();
         HIST.redo.push(step);
         HIST.busy = false;
       }, 0);
@@ -242,16 +248,14 @@ window.DEFS.SELECTION_EVENTS = window.DEFS.SELECTION_EVENTS || {};
       applyTSVAt(step.top, step.left, step.afterTSV);
 
       setTimeout(() => {
-        try{ if (typeof window.render === "function") window.render(); }catch{}
-        safeApplySelectionDOM();
-        clearCaret();
+        afterApply();
         HIST.undo.push(step);
         HIST.busy = false;
       }, 0);
     }
 
     // =========================================================
-    //  Edit helpers (cell-level commit for undo)
+    //  Edit helpers (WHOLE-CELL undo in edit mode)
     // =========================================================
     function placeCaretAtEnd(td){
       try{
@@ -329,6 +333,62 @@ window.DEFS.SELECTION_EVENTS = window.DEFS.SELECTION_EVENTS || {};
       }, 0);
     }
 
+    // ✅ KEY FIX: whole-cell undo/redo even while editing
+    function editModeUndo(){
+      if (!EDIT.active || !Number.isFinite(Number(EDIT.r)) || !Number.isFinite(Number(EDIT.c))) return false;
+
+      const r = Number(EDIT.r), c = Number(EDIT.c);
+      const before = String(EDIT.before ?? "");
+      const after = String(EDIT.td?.textContent ?? "");
+
+      // If nothing changed, still exit edit cleanly
+      if (before === after){
+        if (typeof window.exitEditMode === "function") window.exitEditMode();
+        EDIT.active = false;
+        return true;
+      }
+
+      // push redo step
+      HIST.redo.push({ top:r, left:c, rows:1, cols:1, beforeTSV: before, afterTSV: after });
+
+      // apply before into model, then exit edit + render
+      HIST.busy = true;
+      applyTSVAt(r, c, before);
+
+      setTimeout(() => {
+        try{ if (typeof window.exitEditMode === "function") window.exitEditMode(); }catch{}
+        // clear edit session (do NOT commit)
+        EDIT.active = false; EDIT.r = EDIT.c = null; EDIT.td = null; EDIT.before = "";
+        afterApply();
+        HIST.busy = false;
+      }, 0);
+
+      return true;
+    }
+
+    function editModeRedo(){
+      const step = HIST.redo.pop();
+      if (!step) return false;
+      // only allow redo when it's the same single-cell kind
+      if (!(step && step.rows === 1 && step.cols === 1)) {
+        HIST.redo.push(step);
+        return false;
+      }
+
+      HIST.busy = true;
+      applyTSVAt(step.top, step.left, step.afterTSV);
+
+      setTimeout(() => {
+        try{ if (typeof window.exitEditMode === "function") window.exitEditMode(); }catch{}
+        EDIT.active = false; EDIT.r = EDIT.c = null; EDIT.td = null; EDIT.before = "";
+        afterApply();
+        HIST.undo.push(step);
+        HIST.busy = false;
+      }, 0);
+
+      return true;
+    }
+
     // =========================================================
     //  Paste (fill selection) + undo
     // =========================================================
@@ -390,11 +450,7 @@ window.DEFS.SELECTION_EVENTS = window.DEFS.SELECTION_EVENTS || {};
         pushHist({ top: rect.top, left: rect.left, rows: rect.rows, cols: rect.cols, beforeTSV, afterTSV });
       }, 0);
 
-      setTimeout(() => {
-        try{ if (typeof window.render === "function") window.render(); }catch{}
-        safeApplySelectionDOM();
-        clearCaret();
-      }, 0);
+      setTimeout(afterApply, 0);
     }
 
     // =========================================================
@@ -528,16 +584,23 @@ window.DEFS.SELECTION_EVENTS = window.DEFS.SELECTION_EVENTS || {};
       // record real cut intent
       if (isMod && kl === "x") armCut();
 
-      // Undo/Redo
+      // ✅ Undo/Redo (EDIT MODE first!)
       if (isMod && kl === "z"){
         e.preventDefault();
-        if (e.shiftKey) doRedo();
-        else doUndo();
+        if (window.__CELL_EDIT_MODE){
+          // whole-cell undo while editing
+          if (e.shiftKey) editModeRedo();
+          else editModeUndo();
+        } else {
+          if (e.shiftKey) doRedo();
+          else doUndo();
+        }
         return;
       }
       if (isMod && kl === "y"){
         e.preventDefault();
-        doRedo();
+        if (window.__CELL_EDIT_MODE) editModeRedo();
+        else doRedo();
         return;
       }
 
@@ -577,10 +640,7 @@ window.DEFS.SELECTION_EVENTS = window.DEFS.SELECTION_EVENTS || {};
         API.clearSelectedCells?.();
 
         setTimeout(() => {
-          try{ if (typeof window.render === "function") window.render(); }catch{}
-          safeApplySelectionDOM();
-          clearCaret();
-
+          afterApply();
           const afterTSV = regionToTSV(rect.top, rect.left, rect.rows, rect.cols);
           pushHist({ top: rect.top, left: rect.left, rows: rect.rows, cols: rect.cols, beforeTSV, afterTSV });
         }, 0);
@@ -617,7 +677,6 @@ window.DEFS.SELECTION_EVENTS = window.DEFS.SELECTION_EVENTS || {};
 
       e.preventDefault();
       e.clipboardData?.setData("text/plain", tsv);
-      // IMPORTANT: copy should never arm cut
       disarmCut();
     }, true);
 
@@ -644,14 +703,12 @@ window.DEFS.SELECTION_EVENTS = window.DEFS.SELECTION_EVENTS || {};
 
       setTimeout(() => {
         API.clearSelectedCells?.();
-        try{ if (typeof window.render === "function") window.render(); }catch{}
-        safeApplySelectionDOM();
-        clearCaret();
-
-        const afterTSV = regionToTSV(rect.top, rect.left, rect.rows, rect.cols);
-        pushHist({ top: rect.top, left: rect.left, rows: rect.rows, cols: rect.cols, beforeTSV, afterTSV });
-
-        disarmCut();
+        setTimeout(() => {
+          afterApply();
+          const afterTSV = regionToTSV(rect.top, rect.left, rect.rows, rect.cols);
+          pushHist({ top: rect.top, left: rect.left, rows: rect.rows, cols: rect.cols, beforeTSV, afterTSV });
+          disarmCut();
+        }, 0);
       }, 0);
     }, true);
 
@@ -662,13 +719,17 @@ window.DEFS.SELECTION_EVENTS = window.DEFS.SELECTION_EVENTS || {};
 
       e.preventDefault();
 
+      const rect = selectionRect();
+      if (!rect) return;
+      const beforeTSV = regionToTSV(rect.top, rect.left, rect.rows, rect.cols);
+
       const text = e.clipboardData?.getData("text") ?? "";
       doPasteTextExcelStyle_WithUndo(text);
 
       setTimeout(() => {
-        try{ if (typeof window.render === "function") window.render(); }catch{}
-        safeApplySelectionDOM();
-        clearCaret();
+        afterApply();
+        const afterTSV = regionToTSV(rect.top, rect.left, rect.rows, rect.cols);
+        pushHist({ top: rect.top, left: rect.left, rows: rect.rows, cols: rect.cols, beforeTSV, afterTSV });
       }, 0);
     }, true);
 
