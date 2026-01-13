@@ -19,12 +19,13 @@ window.DEFS.TOOLBAR_OPS = window.DEFS.TOOLBAR_OPS || {};
   // ======================= BLOCK: 01_INSTALL_GUARD_END =======================
 
 
-   // ======================= BLOCK: 02_HELPERS_START =======================
+     // ======================= BLOCK: 02_HELPERS_START =======================
   function _roleIsAdminFallback(){
     const role = String(sessionStorage.getItem("role") || "user").toLowerCase();
     return role === "admin";
   }
 
+  // ✅ 超強 fallback：不靠 CTX 也抓得到 def.cols
   function _getActiveMode(){
     return (CTX && CTX.activeMode) ? CTX.activeMode : (window.activeMode || "model");
   }
@@ -57,69 +58,12 @@ window.DEFS.TOOLBAR_OPS = window.DEFS.TOOLBAR_OPS || {};
     return Number.isFinite(v) && v > 0 ? v : 1;
   }
 
-  // ✅ 保底：如果頁面沒有 delColBtn，就自動生一顆放在 addColBtn 旁邊
-  function _ensureDelColBtnExists(){
+  // ✅ 你要的：刪欄按鈕永遠顯示（不再 hide）
+  function _forceShowDelColBtn(){
     const $ = (CTX && CTX.$) ? CTX.$ : ((id)=>document.getElementById(id));
-    let btn = $("delColBtn");
-    if (btn) return btn;
-
-    const addBtn = $("addColBtn");
-    if (!addBtn) return null;
-
-    btn = document.createElement("button");
-    btn.id = "delColBtn";
-    btn.type = "button";
-    btn.textContent = "Delete Column";
-    btn.style.display = "none"; // 先隱藏，交給 sync 控制
-    btn.style.marginLeft = "6px";
-
-    // 放在 addColBtn 後面
-    addBtn.insertAdjacentElement("afterend", btn);
-
-    // 立刻把 click 綁到你原本的 on("delColBtn",...)（若 on 有事件代理會自動吃到）
-    return btn;
-  }
-
-  // ✅ 防止 toolbar 重畫把按鈕弄丟：觀察 DOM，丟了就補回來
-  function _startDelColBtnGuard(){
-    if (window.__DEL_COL_BTN_GUARD__) return;
-    window.__DEL_COL_BTN_GUARD__ = true;
-
-    const kick = () => {
-      try { _ensureDelColBtnExists(); } catch {}
-      try { _syncDelColBtnVisibility(); } catch {}
-    };
-
-    kick();
-
-    // observer
-    try{
-      const obs = new MutationObserver(() => kick());
-      obs.observe(document.documentElement, { childList:true, subtree:true });
-    } catch {}
-
-    // 短時間 interval 保險（避免 observer 沒抓到）
-    let n = 0;
-    const timer = setInterval(() => {
-      n++;
-      kick();
-      if (n >= 40) clearInterval(timer); // 約 4 秒
-    }, 100);
-  }
-
-  function _syncDelColBtnVisibility(){
-    const $ = (CTX && CTX.$) ? CTX.$ : ((id)=>document.getElementById(id));
-    const btn = $("delColBtn") || _ensureDelColBtnExists();
+    const btn = $("delColBtn");
     if (!btn) return;
-
-    const s = (CTX && typeof CTX.activeSheet === "function")
-      ? CTX.activeSheet()
-      : (typeof window.activeSheet === "function" ? window.activeSheet() : null);
-
-    if (!s) { btn.style.display = "none"; return; }
-
-    const minCols = _minColsForActiveSheet();
-    btn.style.display = (Number(s.cols || 0) > Number(minCols || 0)) ? "" : "none";
+    btn.style.display = ""; // 強制顯示
   }
 
   function _makeSafeSheetName(name, used) {
@@ -136,6 +80,7 @@ window.DEFS.TOOLBAR_OPS = window.DEFS.TOOLBAR_OPS || {};
     return finalName;
   }
 
+  // ✅ XLSX: no row-number column
   function _sheetToAOA_NoRowNumber(s, sheetKey){
     const { ensureSize, activeMode, ensureDafMeta } = CTX;
     ensureSize(s);
@@ -162,6 +107,7 @@ window.DEFS.TOOLBAR_OPS = window.DEFS.TOOLBAR_OPS || {};
     return aoa;
   }
   // ======================= BLOCK: 02_HELPERS_END =======================
+
 
   // ======================= BLOCK: 02B_FLOATING_COL_UI_START =======================
   function _getSheet(){
@@ -334,6 +280,8 @@ window.DEFS.TOOLBAR_OPS = window.DEFS.TOOLBAR_OPS || {};
       showErr, downloadTextFile, csvCell,
       render, refreshUI, setActive, ensureActiveKeyVisible
     } = CTX;
+        _forceShowDelColBtn();
+
 
     // -------------------------
     // Add Row
@@ -362,13 +310,20 @@ window.DEFS.TOOLBAR_OPS = window.DEFS.TOOLBAR_OPS || {};
       _syncDelColBtnVisibility();
     });
 
-    // -------------------------
-    // Delete Column
+       // -------------------------
+    // Delete Column (ALWAYS VISIBLE; just block at minCols)
     // -------------------------
     on("delColBtn","click", () => {
+      _forceShowDelColBtn();
+
       const s = activeSheet();
       const minCols = _minColsForActiveSheet();
-      if (s.cols <= minCols) { alert(t("alert_min_cols")(minCols)); _syncDelColBtnVisibility(); return; }
+
+      // ✅ 到最小就提示，不刪
+      if (Number(s.cols || 0) <= Number(minCols || 0)) {
+        alert(t("alert_min_cols")(minCols));
+        return;
+      }
 
       s.cols -= 1;
       if (Array.isArray(s.headers)) s.headers.length = s.cols;
@@ -386,11 +341,9 @@ window.DEFS.TOOLBAR_OPS = window.DEFS.TOOLBAR_OPS || {};
       render();
       saveToLocalByMode(CTX.activeMode);
 
-      _syncDelColBtnVisibility();
+      // ✅ 永遠顯示（不隱藏）
+      _forceShowDelColBtn();
     });
-
-    // ✅ 開機先同步一次（避免一開始按鈕狀態不對）
-    try { _syncDelColBtnVisibility(); } catch {}
 
     // -------------------------
     // Export CSV (NO row-number column)
@@ -666,6 +619,7 @@ window.DEFS.TOOLBAR_OPS = window.DEFS.TOOLBAR_OPS || {};
   // ======================= BLOCK: 04_EXPORTS_END =======================
 
 })();
+
 
 
 
