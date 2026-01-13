@@ -26,7 +26,52 @@
 
 ========================================================= */
 
-
+/* =========================================================
+   ✅ DEBUG BADGE (畫面可見驗證)
+========================================================= */
+(function installDebugBadge(){
+  // ✅ 建立固定小方塊在畫面右下角
+  const badge = document.createElement("div");
+  badge.id = "dbgBadge";
+  badge.style.cssText = `
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    background: #3b82f6;
+    color: white;
+    padding: 8px 12px;
+    border-radius: 6px;
+    font-size: 12px;
+    font-family: monospace;
+    z-index: 99999;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+    cursor: pointer;
+    user-select: none;
+  `;
+  
+  const timestamp = new Date().toLocaleTimeString("zh-TW", { hour12: false });
+  let clickCount = 0;
+  
+  badge.textContent = `custom_rules loaded ${timestamp} | Clicks: ${clickCount}`;
+  
+  // ✅ 插入到頁面（如果 body 還沒準備好，延遲插入）
+  function insertBadge(){
+    if (document.body) {
+      document.body.appendChild(badge);
+    } else {
+      setTimeout(insertBadge, 10);
+    }
+  }
+  insertBadge();
+  
+  // ✅ 全域 click capture：每次點擊任何地方，數字 +1
+  document.addEventListener("click", function(e){
+    clickCount++;
+    badge.textContent = `custom_rules loaded ${timestamp} | Clicks: ${clickCount}`;
+  }, true); // capture=true 捕捉階段
+  
+  console.log("✅ [custom_rules] Debug badge installed");
+})();
 
 console.log("custom_rules.js loaded - v2026-01-10a");
 
