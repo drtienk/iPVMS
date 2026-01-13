@@ -70,9 +70,27 @@
       color: red;
       min-height: 18px;
     }
+
+    /* ✅ LOGIN VERSION Badge (top-right) */
+    #loginVersionBadge {
+      position: fixed;
+      top: 10px;
+      right: 10px;
+      background: #3b82f6;
+      color: white;
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-size: 10px;
+      font-family: monospace;
+      z-index: 99999;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+    }
   </style>
 </head>
 <body>
+
+  <!-- ✅ LOGIN VERSION Badge -->
+  <div id="loginVersionBadge"></div>
 
   <div class="login-box">
 
@@ -207,8 +225,19 @@
       document.getElementById("msg").textContent = "";
     }
 
+    // ✅ 初始化 LOGIN VERSION Badge
+    function initVersionBadge() {
+      const badge = document.getElementById("loginVersionBadge");
+      if (badge) {
+        const timestamp = new Date().toLocaleTimeString("zh-TW", { hour12: false });
+        badge.textContent = "LOGIN VERSION: " + timestamp;
+      }
+    }
+
     // 初始化語言
     window.addEventListener("DOMContentLoaded", () => {
+      initVersionBadge();
+      
       const savedLang = getLang();
       langSelect.value = savedLang;
       applyLanguage(savedLang);
@@ -304,7 +333,7 @@
           sessionStorage.setItem("companyId", COMPANY_ID_MAP[c] || c);
           sessionStorage.setItem("companyName", c);
 
-          window.location.href = "app.html";
+          window.location.href = "./app.html";
 return;
 
       }
@@ -319,7 +348,7 @@ return;
         sessionStorage.setItem("companyId", account.companyId);
         sessionStorage.setItem("companyName", account.companyName);
 
-        window.location.href = "app.html";
+        window.location.href = "./app.html";
         return;
       }
 
