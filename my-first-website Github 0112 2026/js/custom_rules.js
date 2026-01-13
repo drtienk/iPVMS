@@ -1318,10 +1318,16 @@ const CHECKS_BY_SHEET = {
   }
 };
 
+// ✅ 確保 CHECKS_BY_SHEET 是唯一的全域物件（暴露到 window）
+window.CHECKS_BY_SHEET = CHECKS_BY_SHEET;
+
 /* ✅ 主入口：只跑「目前分頁 activeKey」的規則 */
 function runChecksForActiveSheet(){
+  // ✅ 使用全域的 CHECKS_BY_SHEET（確保是同一物件）
+  const CHECKS = window.CHECKS_BY_SHEET || CHECKS_BY_SHEET;
+  
   // ✅ 確保 CHECKS_BY_SHEET 已定義
-  if (typeof CHECKS_BY_SHEET === "undefined") {
+  if (typeof CHECKS === "undefined") {
     console.error("CHECKS_BY_SHEET is not defined");
     setCheckStatusForCurrentSheet(
       "err",
@@ -1335,7 +1341,7 @@ function runChecksForActiveSheet(){
   }
 
   // ✅ 確保 activeKey 能正確對應到 CHECKS_BY_SHEET
-  let fn = CHECKS_BY_SHEET[activeKey];
+  let fn = CHECKS[activeKey];
 
   // ✅ 如果找不到，檢查是否是 Normal Capacity 的別名，強制對應到 nc
   if (typeof fn !== "function") {
@@ -1343,16 +1349,16 @@ function runChecksForActiveSheet(){
     const NORMAL_CAPACITY_KEYS = ["nc", "normal_capacity", "Normal Capacity", "正常產能", "tabNC"];
     
     // 檢查 activeKey 是否為 Normal Capacity 的別名
-    if (NORMAL_CAPACITY_KEYS.includes(activeKey) && typeof CHECKS_BY_SHEET.nc === "function") {
-      fn = CHECKS_BY_SHEET.nc;
+    if (NORMAL_CAPACITY_KEYS.includes(activeKey) && typeof CHECKS.nc === "function") {
+      fn = CHECKS.nc;
     } else {
       // ✅ 明確列出目前 activeKey 的實際值（用於診斷）
       setCheckStatusForCurrentSheet(
         "warn",
         "Check",
         (lang==="en"
-          ? `No check rules for this sheet. activeKey="${activeKey}" (type: ${typeof activeKey}). Available keys: ${Object.keys(CHECKS_BY_SHEET).join(", ")}`
-          : `此分頁尚未設定檢查規則。activeKey="${activeKey}" (類型: ${typeof activeKey})。可用 keys: ${Object.keys(CHECKS_BY_SHEET).join(", ")}`
+          ? `No check rules for this sheet. activeKey="${activeKey}" (type: ${typeof activeKey}). Available keys: ${Object.keys(CHECKS).join(", ")}`
+          : `此分頁尚未設定檢查規則。activeKey="${activeKey}" (類型: ${typeof activeKey})。可用 keys: ${Object.keys(CHECKS).join(", ")}`
         )
       );
       return;
@@ -1385,7 +1391,8 @@ function runChecksForActiveSheet(){
     // 確保 on 函數和 CHECKS_BY_SHEET 都已定義
     const onFn = window.DEFS?.UTILS?.on || window.on;
     if (typeof onFn !== "function") return false;
-    if (typeof CHECKS_BY_SHEET === "undefined") return false;
+    const CHECKS = window.CHECKS_BY_SHEET;
+    if (typeof CHECKS === "undefined") return false;
     
     // 確保 checkBtn 存在
     const checkBtn = document.getElementById("checkBtn");
