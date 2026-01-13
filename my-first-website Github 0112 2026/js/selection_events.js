@@ -163,8 +163,7 @@ window.DEFS.SELECTION_EVENTS = window.DEFS.SELECTION_EVENTS || {};
     }
 
     // =========================================================
-    // ✅ TSV helpers for COPY/CUT (FIX: multi-cell copy guaranteed)
-    //    不用 API.selectionToTSV，直接依照 Sel.start/end 讀 DOM
+    // ✅ TSV helpers for COPY/CUT (multi-cell copy guaranteed)
     // =========================================================
     function selectionRect(){
       const s = API.Sel?.start, e = API.Sel?.end;
@@ -337,7 +336,7 @@ window.DEFS.SELECTION_EVENTS = window.DEFS.SELECTION_EVENTS || {};
       const c = Number(td.dataset.c);
       if (!Number.isFinite(r) || !Number.isFinite(c)) return;
 
-      // ✅ FIX #1：拖曳時用 setSelection 同步 API selection（copy 才會是多格）
+      // ✅ FIX: drag uses setSelection so copy is multi-cell
       const s = API.Sel?.start;
       if (s && Number.isFinite(Number(s.r)) && Number.isFinite(Number(s.c)) && typeof API.setSelection === "function"){
         API.setSelection({ r:Number(s.r), c:Number(s.c) }, { r, c });
@@ -378,6 +377,13 @@ window.DEFS.SELECTION_EVENTS = window.DEFS.SELECTION_EVENTS || {};
       const ae = document.activeElement;
       if (ae && (ae.tagName === "INPUT" || ae.tagName === "TEXTAREA")) return;
 
+      // ✅ STEP1 FIX: allow native Undo/Redo (do NOT preventDefault)
+      // Windows: Ctrl+Z / Ctrl+Y
+      // Mac:     Cmd+Z / Cmd+Shift+Z
+      const kl = (e.key || "").toLowerCase();
+      const isUndoRedo = ( (e.ctrlKey || e.metaKey) && (kl === "z" || kl === "y") );
+      if (isUndoRedo) return;
+
       if (window.__CELL_EDIT_MODE){
         if (e.key === "Enter"){
           e.preventDefault();
@@ -394,7 +400,6 @@ window.DEFS.SELECTION_EVENTS = window.DEFS.SELECTION_EVENTS || {};
         return;
       }
 
-      const kl = (e.key || "").toLowerCase();
       if (kl === "delete" || kl === "backspace"){
         if (!API.hasSelection?.()) return;
         e.preventDefault();
@@ -423,12 +428,11 @@ window.DEFS.SELECTION_EVENTS = window.DEFS.SELECTION_EVENTS || {};
       }
     }, true);
 
-    // ✅ Copy/Cut/Paste（大量 cell）
+    // ✅ Copy/Cut/Paste（multi-cell）
     document.addEventListener("copy", (e) => {
       if (window.__CELL_EDIT_MODE) return;
       if (!API.hasSelection?.()) return;
 
-      // ✅ FIX #2：用 DOM 直接組 TSV，保證多格一定會複製到
       const tsv = selectionToTSV_ByDOM();
       if (!tsv) return;
 
