@@ -5,6 +5,15 @@ console.log("✅ [toolbar_ops.js] loaded");
 window.DEFS = window.DEFS || {};
 window.DEFS.TOOLBAR_OPS = window.DEFS.TOOLBAR_OPS || {};
 
+
+// ✅ GLOBAL SHIM: avoid ReferenceError on GitHub Pages
+window._syncDelColBtnVisibility = window._syncDelColBtnVisibility || function(){
+  try{
+    const btn = document.getElementById("delColBtn");
+    if (btn) btn.style.display = "";
+  }catch(e){}
+};
+
 // ✅ GLOBAL shim (最重要)：任何地方呼叫都不會 ReferenceError
 // 有人直接呼叫 `_syncDelColBtnVisibility()` 也能活
 function _syncDelColBtnVisibility(){
@@ -654,3 +663,4 @@ window._syncDelColBtnVisibility = _syncDelColBtnVisibility;
   // ======================= BLOCK: 04_EXPORTS_END =======================
 
 })(); // end installToolbarOps IIFE
+

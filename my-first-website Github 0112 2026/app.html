@@ -431,79 +431,88 @@ SAFE TO REPLACE WHOLE BLOCK
   </div>
   <!-- ========= END BLOCK: 29_UI_MODAL_USER_ADMIN ========= -->
 
+
+  <script>
+  // ✅ GLOBAL SHIM (must be defined before any JS)
+  window._syncDelColBtnVisibility = window._syncDelColBtnVisibility || function(){
+    try{
+      const btn = document.getElementById("delColBtn");
+      if (btn) btn.style.display = "";
+    }catch(e){}
+  };
+</script>
+
 <!-- ======================================
   BLOCK: 90_SCRIPTS_ALL
   AREA: BODY END / all scripts
   SAFE TO REPLACE WHOLE BLOCK
   ====================================== -->
-<script src="js/defs.js"></script>
-<script src="js/sheets_def_registry.js"></script>
-<script src="js/tabs_def.js"></script>
-<script src="js/i18n_def.js"></script>
-
-<script src="js/i18n_role.js"></script>
-
-<script src="js/lang_ui.js"></script>
-<script src="js/tabs_ui.js"></script>
-
-<script src="js/utils.js"></script>
-<script src="js/utils_globals.js"></script>
-
-<script src="js/visibility_store.js"></script>
-<script src="js/period_store.js"></script>
-<script src="js/user_directory_store.js"></script>
-
-<script src="js/mode_storage_store.js"></script>
-<script src="js/sheets_core_store.js"></script>
-
-<!-- ✅ core app states (do not run init here) -->
-<script src="js/app_state_login.js"></script>
-<script src="js/app_sheets_core.js"></script>
-<script src="js/app_mode_storage.js"></script>
-
-<script src="js/table_core.js"></script>
-<script src="js/selection_core.js"></script>
-<script src="js/selection_events.js"></script>
-
-<script src="js/table_core_bootstrap.js"></script>
-<script src="js/table_render_core.js"></script>
-
-<script src="js/toolbar_ops.js"></script>
-<script src="js/sheet_admin_ui.js"></script>
-<script src="js/period_ui.js"></script>
-
-<!-- router/app core -->
-<script src="js/mode_router.js"></script>
-<script src="js/app.js"></script>
-
-<!-- wrappers / delegates -->
-<script src="js/lang_apply.js"></script>
-<script src="js/tabs_ui_wrappers.js"></script>
-<script src="js/router_wrappers.js"></script>
-<script src="js/period_ui_delegate.js"></script>
-
-<script src="js/toolbar_delegate.js"></script>
-<script src="js/sheet_admin_delegate.js"></script>
-<script src="js/user_admin_stub.js"></script>
-
-<script src="js/user_added_col_flag.js"></script>
-<script src="js/resource_level_n_buttons.js"></script>
-<script src="js/model_all_required_company_bu.js"></script>
-<script src="js/required_fields_guide.js"></script>
-<script src="js/required_legend.js"></script>
-<script src="js/company_row_lock.js"></script>
-
-<!-- ✅ Rules modules (load before custom_rules.js dispatcher) -->
-<script src="js/rules_normal_capacity.js"></script>
-
-<script src="js/custom_rules.js"></script>
-
-<!-- ✅ IMPORTANT: init MUST be last -->
-<script src="js/app_init.js"></script>
-
-<!-- ========= END BLOCK: 90_SCRIPTS_ALL ========= -->
-
-
+  <script src="js/defs.js"></script>
+  <script src="js/sheets_def_registry.js"></script>
+  <script src="js/tabs_def.js"></script>
+  <script src="js/i18n_def.js"></script>
+  
+  <script src="js/i18n_role.js"></script>
+  
+  <script src="js/lang_ui.js"></script>
+  <script src="js/tabs_ui.js"></script>
+  
+  <script src="js/utils.js"></script>
+  <script src="js/utils_globals.js"></script>
+  
+  <script src="js/visibility_store.js"></script>
+  <script src="js/period_store.js"></script>
+  <script src="js/user_directory_store.js"></script>
+  
+  <script src="js/mode_storage_store.js"></script>
+  <script src="js/sheets_core_store.js"></script>
+  
+  <!-- ✅ core app states (do not run init here) -->
+  <script src="js/app_state_login.js"></script>
+  <script src="js/app_sheets_core.js"></script>
+  <script src="js/app_mode_storage.js"></script>
+  
+  <script src="js/table_core.js"></script>
+  <script src="js/selection_core.js"></script>
+  <script src="js/selection_events.js"></script>
+  
+  <script src="js/table_core_bootstrap.js"></script>
+  <script src="js/table_render_core.js"></script>
+  
+  <script src="js/toolbar_ops.js"></script>
+  <script src="js/sheet_admin_ui.js"></script>
+  <script src="js/period_ui.js"></script>
+  
+  <!-- router/app core -->
+  <script src="js/mode_router.js"></script>
+  <script src="js/app.js"></script>
+  
+  <!-- wrappers / delegates -->
+  <script src="js/lang_apply.js"></script>
+  <script src="js/tabs_ui_wrappers.js"></script>
+  <script src="js/router_wrappers.js"></script>
+  <script src="js/period_ui_delegate.js"></script>
+  
+  <script src="js/toolbar_delegate.js"></script>
+  <script src="js/sheet_admin_delegate.js"></script>
+  <script src="js/user_admin_stub.js"></script>
+  
+  <script src="js/user_added_col_flag.js"></script>
+  <script src="js/resource_level_n_buttons.js"></script>
+  <script src="js/model_all_required_company_bu.js"></script>
+  <script src="js/required_fields_guide.js"></script>
+  <script src="js/required_legend.js"></script>
+  <script src="js/company_row_lock.js"></script>
+  
+  <!-- ✅ Normal Capacity rules MUST load BEFORE custom_rules -->
+  <script src="js/rules_normal_capacity.js"></script>
+  <script src="js/custom_rules.js"></script>
+  
+  <!-- ✅ IMPORTANT: init MUST be last -->
+  <script src="js/app_init.js"></script>
+  
+  <!-- ========= END BLOCK: 90_SCRIPTS_ALL ========= -->
+  
 
   <!-- ======================================
   BLOCK: 91_ROLE_GUARD_ADMIN_ONLY_UI
@@ -534,3 +543,5 @@ SAFE TO REPLACE WHOLE BLOCK
 
 </body>
 </html>
+
+
