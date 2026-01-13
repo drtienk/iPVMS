@@ -1,4 +1,4 @@
-console.log("✅ [selection_events.js] loaded");
+console.log("✅ [selection_events.js] loaded (UNDO v2)");
 
 window.DEFS = window.DEFS || {};
 window.DEFS.SELECTION_EVENTS = window.DEFS.SELECTION_EVENTS || {};
@@ -26,7 +26,7 @@ window.DEFS.SELECTION_EVENTS = window.DEFS.SELECTION_EVENTS || {};
       try{
         const sel = window.getSelection?.();
         if (sel) sel.removeAllRanges();
-      } catch {}
+      }catch{}
     }
 
     function clearVisual(){
@@ -36,7 +36,7 @@ window.DEFS.SELECTION_EVENTS = window.DEFS.SELECTION_EVENTS || {};
           VIS.activeTD.style.outlineOffset = "";
         }
         VIS.rangeTDs.forEach(td => td.style.background = "");
-      } catch {}
+      }catch{}
       VIS.activeTD = null;
       VIS.rangeTDs = [];
     }
@@ -92,7 +92,6 @@ window.DEFS.SELECTION_EVENTS = window.DEFS.SELECTION_EVENTS || {};
         td.style.outline = VIS.activeOutline;
         td.style.outlineOffset = "-2px";
         td.style.background = "";
-
         VIS.activeTD = td;
       } else {
         const tds = getSelectedTDsByDOM();
@@ -109,46 +108,10 @@ window.DEFS.SELECTION_EVENTS = window.DEFS.SELECTION_EVENTS || {};
     }
 
     // =========================================================
-    //  Undo/Redo stack (custom)  ✅ Ctrl/⌘+Z / Ctrl/⌘+Y / ⌘+Shift+Z
+    //  TSV helpers
     // =========================================================
-    const HIST = {
-      undo: [],
-      redo: [],
-      max: 200,
-      busy: false
-    };
-
     function normalizeClipboardText(s){
       return String(s ?? "").replace(/\r\n/g, "\n").replace(/\r/g, "\n");
-    }
-
-    function selectionRect(){
-      const s = API.Sel?.start, e = API.Sel?.end;
-      if (!s || !e) return null;
-
-      const r1 = Number(s.r), c1 = Number(s.c);
-      const r2 = Number(e.r), c2 = Number(e.c);
-      if (![r1,c1,r2,c2].every(Number.isFinite)) return null;
-
-      const top = Math.min(r1, r2);
-      const left = Math.min(c1, c2);
-      const bottom = Math.max(r1, r2);
-      const right = Math.max(c1, c2);
-
-      return { top, left, bottom, right, rows: bottom-top+1, cols: right-left+1 };
-    }
-
-    function regionToTSV(top, left, rows, cols){
-      const lines = [];
-      for (let r = top; r < top + rows; r++){
-        const row = [];
-        for (let c = left; c < left + cols; c++){
-          const td = getTDByRC(r, c);
-          row.push(String(td?.textContent ?? "").replace(/\r?\n/g, " "));
-        }
-        lines.push(row.join("\t"));
-      }
-      return lines.join("\n");
     }
 
     function parseTSVToMatrix(text){
@@ -181,17 +144,73 @@ window.DEFS.SELECTION_EVENTS = window.DEFS.SELECTION_EVENTS || {};
       return out;
     }
 
-    function pushHist(step){
-      try{
-        if (!step) return;
-        HIST.undo.push(step);
-        if (HIST.undo.length > HIST.max) HIST.undo.shift();
-        HIST.redo.length = 0;
-      } catch {}
+    function selectionRect(){
+      const s = API.Sel?.start, e = API.Sel?.end;
+      if (!s || !e) return null;
+
+      const r1 = Number(s.r), c1 = Number(s.c);
+      const r2 = Number(e.r), c2 = Number(e.c);
+      if (![r1,c1,r2,c2].every(Number.isFinite)) return null;
+
+      const top = Math.min(r1, r2);
+      const left = Math.min(c1, c2);
+      const bottom = Math.max(r1, r2);
+      const right = Math.max(c1, c2);
+
+      return { top, left, bottom, right, rows: bottom-top+1, cols: right-left+1 };
     }
 
-    function applyTSVAt(top, left, tsv){
-      API.pasteTSVAt?.(top, left, tsv);
+    function regionToTSV(top, left, rows, cols){
+      const lines = [];
+      for (let r = top; r < top + rows; r++){
+        const row = [];
+        for (let c = left; c < left + cols; c++){
+          const td = getTDByRC(r, c);
+          row.push(String(td?.textContent ?? "").replace(/\r?\n/g, " "));
+        }
+        lines.push(row.join("\t"));
+      }
+      return lines.join("\n");
+    }
+
+    // =========================================================
+    // ✅ APPLY TSV (hard-write DOM + best-effort sync to model)
+    // =========================================================
+    function setCellValueBestEffort(r, c, value){
+      const td = getTDByRC(r, c);
+      if (td) td.textContent = String(value ?? "");
+
+      // try to sync into underlying data model if such APIs exist
+      try{
+        if (typeof API.setCellValue === "function") API.setCellValue(r, c, String(value ?? ""));
+        else if (typeof API.setValueAt === "function") API.setValueAt(r, c, String(value ?? ""));
+        else if (typeof API.setCell === "function") API.setCell(r, c, String(value ?? ""));
+      }catch{}
+    }
+
+    function applyTSV_Direct(top, left, tsv){
+      const mat = parseTSVToMatrix(tsv);
+      const rows = mat.length;
+      const cols = Math.max(1, ...mat.map(r => r.length || 1));
+      for (let rr = 0; rr < rows; rr++){
+        for (let cc = 0; cc < cols; cc++){
+          const v = (mat[rr] && mat[rr][cc] !== undefined) ? mat[rr][cc] : "";
+          setCellValueBestEffort(top + rr, left + cc, v);
+        }
+      }
+    }
+
+    // =========================================================
+    //  Undo/Redo stack (custom)
+    // =========================================================
+    const HIST = { undo: [], redo: [], max: 200, busy: false };
+
+    function pushHist(step){
+      if (!step) return;
+      HIST.undo.push(step);
+      if (HIST.undo.length > HIST.max) HIST.undo.shift();
+      HIST.redo.length = 0;
+      console.log("🟨 HIST push:", step.rows+"x"+step.cols, "@", step.top, step.left);
     }
 
     function doUndo(){
@@ -199,18 +218,21 @@ window.DEFS.SELECTION_EVENTS = window.DEFS.SELECTION_EVENTS || {};
       const step = HIST.undo.pop();
       if (!step) return;
       HIST.busy = true;
+      console.log("↩️ UNDO", step.rows+"x"+step.cols, "@", step.top, step.left);
+
       try{
-        applyTSVAt(step.top, step.left, step.beforeTSV);
-        setTimeout(() => {
-          if (typeof window.render === "function") window.render();
-          safeApplySelectionDOM();
-          clearCaret();
-          HIST.redo.push(step);
-          HIST.busy = false;
-        }, 0);
-      } catch {
-        HIST.busy = false;
+        applyTSV_Direct(step.top, step.left, step.beforeTSV);
+      }catch(e){
+        console.warn("UNDO apply failed", e);
       }
+
+      setTimeout(() => {
+        try{ if (typeof window.render === "function") window.render(); }catch{}
+        safeApplySelectionDOM();
+        clearCaret();
+        HIST.redo.push(step);
+        HIST.busy = false;
+      }, 0);
     }
 
     function doRedo(){
@@ -218,18 +240,21 @@ window.DEFS.SELECTION_EVENTS = window.DEFS.SELECTION_EVENTS || {};
       const step = HIST.redo.pop();
       if (!step) return;
       HIST.busy = true;
+      console.log("↪️ REDO", step.rows+"x"+step.cols, "@", step.top, step.left);
+
       try{
-        applyTSVAt(step.top, step.left, step.afterTSV);
-        setTimeout(() => {
-          if (typeof window.render === "function") window.render();
-          safeApplySelectionDOM();
-          clearCaret();
-          HIST.undo.push(step);
-          HIST.busy = false;
-        }, 0);
-      } catch {
-        HIST.busy = false;
+        applyTSV_Direct(step.top, step.left, step.afterTSV);
+      }catch(e){
+        console.warn("REDO apply failed", e);
       }
+
+      setTimeout(() => {
+        try{ if (typeof window.render === "function") window.render(); }catch{}
+        safeApplySelectionDOM();
+        clearCaret();
+        HIST.undo.push(step);
+        HIST.busy = false;
+      }, 0);
     }
 
     // =========================================================
@@ -244,7 +269,7 @@ window.DEFS.SELECTION_EVENTS = window.DEFS.SELECTION_EVENTS || {};
         range.collapse(false);
         sel.removeAllRanges();
         sel.addRange(range);
-      } catch {}
+      }catch{}
     }
 
     function enterEditOnTD(td, evt){
@@ -276,27 +301,28 @@ window.DEFS.SELECTION_EVENTS = window.DEFS.SELECTION_EVENTS || {};
     }
 
     function replaceCellWithChar(td, ch, evt){
-      // undo record: 1x1 region at selection start
       const rect = selectionRect();
       if (!rect) return;
-
       const beforeTSV = regionToTSV(rect.top, rect.left, 1, 1);
 
       enterEditOnTD(td, evt);
       setTimeout(() => {
         try{
           td.textContent = ch;
+          setCellValueBestEffort(rect.top, rect.left, ch);
           placeCaretAtEnd(td);
+        }catch{}
+        setTimeout(() => {
           const afterTSV = regionToTSV(rect.top, rect.left, 1, 1);
           if (beforeTSV !== afterTSV){
             pushHist({ top: rect.top, left: rect.left, rows:1, cols:1, beforeTSV, afterTSV });
           }
-        } catch {}
+        }, 30);
       }, 0);
     }
 
     // =========================================================
-    // ✅ Copy/Cut/Paste TSV (multi-cell copy guaranteed)
+    //  Paste/Cut/Delete (record before/after with delay)
     // =========================================================
     function selectionToTSV_ByDOM(){
       const rect = selectionRect();
@@ -317,27 +343,19 @@ window.DEFS.SELECTION_EVENTS = window.DEFS.SELECTION_EVENTS || {};
 
       if (isSingleSel){
         const t = normalizeClipboardText(text);
-        API.pasteTSVAt?.(API.Sel.start.r, API.Sel.start.c, t);
-
-        setTimeout(() => {
-          const afterTSV = regionToTSV(rect.top, rect.left, 1, 1);
-          if (beforeTSV !== afterTSV){
-            pushHist({ top: rect.top, left: rect.left, rows:1, cols:1, beforeTSV, afterTSV });
-          }
-        }, 0);
-        return;
+        applyTSV_Direct(rect.top, rect.left, t);
+      } else {
+        const tiled = tileMatrixToSize(clipMat, rect.rows, rect.cols);
+        const outTSV = matrixToTSV(tiled);
+        applyTSV_Direct(rect.top, rect.left, outTSV);
       }
-
-      const tiled = tileMatrixToSize(clipMat, rect.rows, rect.cols);
-      const outTSV = matrixToTSV(tiled);
-      API.pasteTSVAt?.(rect.top, rect.left, outTSV);
 
       setTimeout(() => {
         const afterTSV = regionToTSV(rect.top, rect.left, rect.rows, rect.cols);
         if (beforeTSV !== afterTSV){
           pushHist({ top: rect.top, left: rect.left, rows:rect.rows, cols:rect.cols, beforeTSV, afterTSV });
         }
-      }, 0);
+      }, 30);
     }
 
     // =========================================================
@@ -373,7 +391,6 @@ window.DEFS.SELECTION_EVENTS = window.DEFS.SELECTION_EVENTS || {};
       if (window.__CELL_EDIT_MODE && window.__EDIT_CELL_KEY === key) return;
 
       exitEdit();
-
       e.preventDefault();
       clearCaret();
 
@@ -393,7 +410,6 @@ window.DEFS.SELECTION_EVENTS = window.DEFS.SELECTION_EVENTS || {};
       API.setSelection?.({r,c}, {r,c});
       safeApplySelectionDOM();
       clearCaret();
-
       markDown(e);
     }, true);
 
@@ -453,17 +469,20 @@ window.DEFS.SELECTION_EVENTS = window.DEFS.SELECTION_EVENTS || {};
       const ae = document.activeElement;
       if (ae && (ae.tagName === "INPUT" || ae.tagName === "TEXTAREA")) return;
 
-      // ✅ Undo / Redo (custom)
       const kl = (e.key || "").toLowerCase();
       const isMod = (e.ctrlKey || e.metaKey);
+
+      // ✅ Undo/Redo
       if (isMod && kl === "z"){
         e.preventDefault();
+        console.log("🟦 key UNDO (z) shift=", !!e.shiftKey);
         if (e.shiftKey) doRedo();
         else doUndo();
         return;
       }
       if (isMod && kl === "y"){
         e.preventDefault();
+        console.log("🟦 key REDO (y)");
         doRedo();
         return;
       }
@@ -496,14 +515,16 @@ window.DEFS.SELECTION_EVENTS = window.DEFS.SELECTION_EVENTS || {};
         API.clearSelectedCells?.();
 
         setTimeout(() => {
-          if (typeof window.render === "function") window.render();
+          try{ if (typeof window.render === "function") window.render(); }catch{}
           safeApplySelectionDOM();
           clearCaret();
 
-          const afterTSV = regionToTSV(rect.top, rect.left, rect.rows, rect.cols);
-          if (beforeTSV !== afterTSV){
-            pushHist({ top: rect.top, left: rect.left, rows:rect.rows, cols:rect.cols, beforeTSV, afterTSV });
-          }
+          setTimeout(() => {
+            const afterTSV = regionToTSV(rect.top, rect.left, rect.rows, rect.cols);
+            if (beforeTSV !== afterTSV){
+              pushHist({ top: rect.top, left: rect.left, rows:rect.rows, cols:rect.cols, beforeTSV, afterTSV });
+            }
+          }, 30);
         }, 0);
         return;
       }
@@ -554,14 +575,16 @@ window.DEFS.SELECTION_EVENTS = window.DEFS.SELECTION_EVENTS || {};
 
       setTimeout(() => {
         API.clearSelectedCells?.();
-        if (typeof window.render === "function") window.render();
+        try{ if (typeof window.render === "function") window.render(); }catch{}
         safeApplySelectionDOM();
         clearCaret();
 
-        const afterTSV = regionToTSV(rect.top, rect.left, rect.rows, rect.cols);
-        if (beforeTSV !== afterTSV){
-          pushHist({ top: rect.top, left: rect.left, rows:rect.rows, cols:rect.cols, beforeTSV, afterTSV });
-        }
+        setTimeout(() => {
+          const afterTSV = regionToTSV(rect.top, rect.left, rect.rows, rect.cols);
+          if (beforeTSV !== afterTSV){
+            pushHist({ top: rect.top, left: rect.left, rows:rect.rows, cols:rect.cols, beforeTSV, afterTSV });
+          }
+        }, 30);
       }, 0);
     }, true);
 
@@ -570,12 +593,11 @@ window.DEFS.SELECTION_EVENTS = window.DEFS.SELECTION_EVENTS || {};
       if (!API.hasSelection?.() || !API.Sel?.start) return;
 
       e.preventDefault();
-
       const text = e.clipboardData?.getData("text") ?? "";
       doPasteTextExcelStyle(text);
 
       setTimeout(() => {
-        if (typeof window.render === "function") window.render();
+        try{ if (typeof window.render === "function") window.render(); }catch{}
         safeApplySelectionDOM();
         clearCaret();
       }, 0);
@@ -585,6 +607,12 @@ window.DEFS.SELECTION_EVENTS = window.DEFS.SELECTION_EVENTS || {};
       safeApplySelectionDOM();
       clearCaret();
     }, 0);
+
+    console.log("✅ [selection_events.js] bound (UNDO v2)", {
+      hasPasteTSVAt: typeof API.pasteTSVAt === "function",
+      hasSetCellValue: typeof API.setCellValue === "function",
+      hasSetValueAt: typeof API.setValueAt === "function",
+    });
 
     return true;
   }
