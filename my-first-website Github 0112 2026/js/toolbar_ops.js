@@ -5,16 +5,16 @@ console.log("✅ [toolbar_ops.js] loaded");
 window.DEFS = window.DEFS || {};
 window.DEFS.TOOLBAR_OPS = window.DEFS.TOOLBAR_OPS || {};
 
-// ✅ GLOBAL: 讓任何檔案/任何位置呼叫都不會 ReferenceError
+// ✅ GLOBAL: 任何地方呼叫都不會炸
 function _syncDelColBtnVisibility(){
   try{
     const btn = document.getElementById("delColBtn");
     if (btn) btn.style.display = "";
   } catch(_e){}
 }
-// 也掛到 window（保險）
 window._syncDelColBtnVisibility = _syncDelColBtnVisibility;
 // ======================= BLOCK: 00_FILE_HEADER END =======================
+
 
 
 (function installToolbarOps(){
@@ -453,6 +453,7 @@ window.DEFS.TOOLBAR_OPS.syncDelColBtnVisibility = _syncDelColBtnVisibility;
 
 
 })();
+
 
 
 
