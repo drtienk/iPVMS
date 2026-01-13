@@ -25,7 +25,6 @@ window.DEFS.TOOLBAR_OPS = window.DEFS.TOOLBAR_OPS || {};
     return role === "admin";
   }
 
-  // ✅ 超強 fallback：不靠 CTX 也抓得到 def.cols
   function _getActiveMode(){
     return (CTX && CTX.activeMode) ? CTX.activeMode : (window.activeMode || "model");
   }
@@ -58,12 +57,39 @@ window.DEFS.TOOLBAR_OPS = window.DEFS.TOOLBAR_OPS || {};
     return Number.isFinite(v) && v > 0 ? v : 1;
   }
 
-  // ✅ 你要的：刪欄按鈕永遠顯示（不再 hide）
+  // ✅ 永遠顯示 Delete Column button
   function _forceShowDelColBtn(){
     const $ = (CTX && CTX.$) ? CTX.$ : ((id)=>document.getElementById(id));
     const btn = $("delColBtn");
     if (!btn) return;
     btn.style.display = ""; // 強制顯示
+  }
+
+  // ✅ 硬保護：有人把它藏起來，就立刻顯示回來
+  function _installDelColBtnKeeper(){
+    if (window.__DEL_COL_BTN_KEEPER_INSTALLED__) return;
+    window.__DEL_COL_BTN_KEEPER_INSTALLED__ = true;
+
+    function tick(){
+      try{ _forceShowDelColBtn(); } catch(_e){}
+    }
+
+    // 1) 立即做一次
+    tick();
+
+    // 2) 短時間多次補強（避免 init 後又被別人藏）
+    let n = 0;
+    const timer = setInterval(() => {
+      n++;
+      tick();
+      if (n >= 50) clearInterval(timer); // 約 5 秒
+    }, 100);
+
+    // 3) 監聽 DOM 變動（有人改 style/class 時）
+    try{
+      const obs = new MutationObserver(() => tick());
+      obs.observe(document.documentElement, { attributes:true, subtree:true, childList:true });
+    } catch(_e){}
   }
 
   function _makeSafeSheetName(name, used) {
@@ -80,7 +106,6 @@ window.DEFS.TOOLBAR_OPS = window.DEFS.TOOLBAR_OPS || {};
     return finalName;
   }
 
-  // ✅ XLSX: no row-number column
   function _sheetToAOA_NoRowNumber(s, sheetKey){
     const { ensureSize, activeMode, ensureDafMeta } = CTX;
     ensureSize(s);
@@ -107,6 +132,7 @@ window.DEFS.TOOLBAR_OPS = window.DEFS.TOOLBAR_OPS || {};
     return aoa;
   }
   // ======================= BLOCK: 02_HELPERS_END =======================
+
 
 
   // ======================= BLOCK: 02B_FLOATING_COL_UI_START =======================
@@ -280,7 +306,9 @@ window.DEFS.TOOLBAR_OPS = window.DEFS.TOOLBAR_OPS || {};
       showErr, downloadTextFile, csvCell,
       render, refreshUI, setActive, ensureActiveKeyVisible
     } = CTX;
-        _forceShowDelColBtn();
+            _installDelColBtnKeeper();
+    _forceShowDelColBtn();
+
 
 
     // -------------------------
@@ -619,6 +647,7 @@ window.DEFS.TOOLBAR_OPS = window.DEFS.TOOLBAR_OPS || {};
   // ======================= BLOCK: 04_EXPORTS_END =======================
 
 })();
+
 
 
 
