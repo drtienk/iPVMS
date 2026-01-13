@@ -18,7 +18,20 @@ window.DEFS.TOOLBAR_OPS = window.DEFS.TOOLBAR_OPS || {};
   }
   // ======================= BLOCK: 01_INSTALL_GUARD_END =======================
 
+// ======================= BLOCK: 02A_SYNC_DEL_COL_VISIBILITY_START =======================
+function _syncDelColBtnVisibility(){
+  try{
+    // 你現在的策略：Delete Column 永遠顯示
+    _forceShowDelColBtn();
 
+    // 同步浮動 -Col UI（如果有裝）
+    try{ _syncFloatingUI(); } catch(_e){}
+  } catch(_e){}
+}
+// ======================= BLOCK: 02A_SYNC_DEL_COL_VISIBILITY_END =======================
+
+
+  
      // ======================= BLOCK: 02_HELPERS_START =======================
   function _roleIsAdminFallback(){
     const role = String(sessionStorage.getItem("role") || "user").toLowerCase();
@@ -647,6 +660,7 @@ window.DEFS.TOOLBAR_OPS = window.DEFS.TOOLBAR_OPS || {};
   // ======================= BLOCK: 04_EXPORTS_END =======================
 
 })();
+
 
 
 
