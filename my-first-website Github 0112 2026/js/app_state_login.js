@@ -12,7 +12,7 @@ console.log('✅ [02] app_state_login loaded');
 (function installAppStateLogin(){
 
   // ✅ config
-  var LOGIN_PAGE = "login.html";
+  var LOGIN_PAGE = "my-first-website Github 0112 2026/login.html";
   var ENABLE_AUTO_REDIRECT = false;
 
   // ✅ mode state (GLOBAL)
@@ -117,3 +117,4 @@ console.log('✅ [02] app_state_login loaded');
 
 })();
  /* ======================= END MODULE: 02_APP_STATE_LOGIN ======================= */
+
