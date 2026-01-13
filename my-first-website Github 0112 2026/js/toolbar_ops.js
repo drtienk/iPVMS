@@ -163,13 +163,163 @@ window.DEFS.TOOLBAR_OPS = window.DEFS.TOOLBAR_OPS || {};
   }
   // ======================= BLOCK: 02_HELPERS_END =======================
 
+  // ======================= BLOCK: 02B_FLOATING_COL_UI_START =======================
+  function _getSheet(){
+    return (CTX && typeof CTX.activeSheet === "function")
+      ? CTX.activeSheet()
+      : (typeof window.activeSheet === "function" ? window.activeSheet() : null);
+  }
+
+  function _getRender(){
+    return (CTX && typeof CTX.render === "function")
+      ? CTX.render
+      : (typeof window.render === "function" ? window.render : null);
+  }
+
+  function _save(){
+    try{
+      if (CTX && typeof CTX.saveToLocalByMode === "function") CTX.saveToLocalByMode(_getActiveMode());
+    } catch {}
+  }
+
+  function _ensureHeadersLen(s){
+    if (!Array.isArray(s.headers)) s.headers = [];
+    while (s.headers.length < s.cols) s.headers.push("");
+    if (s.headers.length > s.cols) s.headers.length = s.cols;
+  }
+
+  function _trimDataToCols(s){
+    if (!Array.isArray(s.data)) return;
+    for (let r=0; r<s.data.length; r++){
+      if (Array.isArray(s.data[r])) s.data[r].length = s.cols;
+    }
+  }
+
+  function _addCol(){
+    const s = _getSheet();
+    if (!s) return;
+
+    s.cols = Number(s.cols||0) + 1;
+    _ensureHeadersLen(s);
+
+    try{ CTX?.ensureHeadersForActiveSheet?.(); } catch {}
+    try{ CTX?.ensureSize?.(s); } catch {}
+
+    const render = _getRender();
+    if (render) render();
+    _save();
+    _syncFloatingUI();
+  }
+
+  function _delCol(){
+    const s = _getSheet();
+    if (!s) return;
+
+    const minCols = _minColsForActiveSheet();
+    if (Number(s.cols||0) <= Number(minCols||0)) return;
+
+    s.cols = Number(s.cols||0) - 1;
+    _ensureHeadersLen(s);
+
+    // DAF meta trim（period/daf）
+    try{
+      if (_getActiveMode() === "period" && _getActiveKey() === "daf" && s.meta){
+        if (Array.isArray(s.meta.dafDesc)) s.meta.dafDesc.length = s.cols;
+        if (Array.isArray(s.meta.dafEnt))  s.meta.dafEnt.length  = s.cols;
+      }
+    } catch {}
+
+    _trimDataToCols(s);
+
+    const render = _getRender();
+    if (render) render();
+    _save();
+    _syncFloatingUI();
+  }
+
+  function _syncFloatingUI(){
+    const box = document.getElementById("__FLOAT_COL_BOX__");
+    if (!box) return;
+
+    const btnDel = document.getElementById("__FLOAT_COL_DEL__");
+    const s = _getSheet();
+    if (!btnDel || !s) return;
+
+    const minCols = _minColsForActiveSheet();
+    btnDel.style.display = (Number(s.cols||0) > Number(minCols||0)) ? "" : "none";
+  }
+
+  function _installFloatingColUI(){
+    if (window.__FLOAT_COL_UI_INSTALLED__) return;
+    window.__FLOAT_COL_UI_INSTALLED__ = true;
+
+    const mount = () => {
+      if (document.getElementById("__FLOAT_COL_BOX__")) { _syncFloatingUI(); return; }
+
+      const box = document.createElement("div");
+      box.id = "__FLOAT_COL_BOX__";
+      box.style.position = "fixed";
+      box.style.right = "14px";
+      box.style.bottom = "14px";
+      box.style.zIndex = "99999";
+      box.style.background = "rgba(255,255,255,0.92)";
+      box.style.border = "1px solid #ccc";
+      box.style.borderRadius = "10px";
+      box.style.padding = "8px";
+      box.style.boxShadow = "0 6px 18px rgba(0,0,0,0.15)";
+      box.style.fontFamily = "system-ui, -apple-system, Segoe UI, Arial";
+      box.style.display = "flex";
+      box.style.gap = "8px";
+      box.style.alignItems = "center";
+
+      const btnAdd = document.createElement("button");
+      btnAdd.id = "__FLOAT_COL_ADD__";
+      btnAdd.type = "button";
+      btnAdd.textContent = "+ Col";
+      btnAdd.style.padding = "6px 10px";
+      btnAdd.style.borderRadius = "8px";
+      btnAdd.style.border = "1px solid #999";
+      btnAdd.style.cursor = "pointer";
+
+      const btnDel = document.createElement("button");
+      btnDel.id = "__FLOAT_COL_DEL__";
+      btnDel.type = "button";
+      btnDel.textContent = "- Col";
+      btnDel.style.padding = "6px 10px";
+      btnDel.style.borderRadius = "8px";
+      btnDel.style.border = "1px solid #999";
+      btnDel.style.cursor = "pointer";
+
+      btnAdd.addEventListener("click", _addCol);
+      btnDel.addEventListener("click", _delCol);
+
+      box.appendChild(btnAdd);
+      box.appendChild(btnDel);
+      document.body.appendChild(box);
+
+      _syncFloatingUI();
+
+      // 任何 DOM 大改動後也同步一次（保險）
+      try{
+        const obs = new MutationObserver(() => _syncFloatingUI());
+        obs.observe(document.documentElement, { childList:true, subtree:true });
+      } catch {}
+    };
+
+    if (document.readyState === "loading") {
+      document.addEventListener("DOMContentLoaded", mount, { once:true });
+    } else {
+      mount();
+    }
+  }
+  // ======================= BLOCK: 02B_FLOATING_COL_UI_END =======================
 
 
 
   // ======================= BLOCK: 03_BIND_TOOLBAR_EVENTS_START =======================
   function bindToolbarEvents(){
     if (!CTX) return;
-    _startDelColBtnGuard();
+    _installFloatingColUI();
     if (bindToolbarEvents.__bound) return;
     bindToolbarEvents.__bound = true;
 
@@ -516,5 +666,6 @@ window.DEFS.TOOLBAR_OPS = window.DEFS.TOOLBAR_OPS || {};
   // ======================= BLOCK: 04_EXPORTS_END =======================
 
 })();
+
 
 
