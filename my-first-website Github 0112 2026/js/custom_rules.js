@@ -1324,11 +1324,11 @@ window.CHECKS_BY_SHEET = CHECKS_BY_SHEET;
 /* ✅ 主入口：只跑「目前分頁 activeKey」的規則 */
 function runChecksForActiveSheet(){
   // ✅ 使用全域的 CHECKS_BY_SHEET（確保是同一物件）
-  const CHECKS = window.CHECKS_BY_SHEET || CHECKS_BY_SHEET;
+  // 直接使用 window.CHECKS_BY_SHEET，確保是唯一的全域物件
+  const CHECKS = window.CHECKS_BY_SHEET;
   
   // ✅ 確保 CHECKS_BY_SHEET 已定義
-  if (typeof CHECKS === "undefined") {
-    console.error("CHECKS_BY_SHEET is not defined");
+  if (!CHECKS || typeof CHECKS !== "object") {
     setCheckStatusForCurrentSheet(
       "err",
       "Check",
@@ -1341,28 +1341,29 @@ function runChecksForActiveSheet(){
   }
 
   // ✅ 確保 activeKey 能正確對應到 CHECKS_BY_SHEET
-  let fn = CHECKS[activeKey];
-
-  // ✅ 如果找不到，檢查是否是 Normal Capacity 的別名，強制對應到 nc
+  // 優先直接查找，如果找不到且 activeKey 是 "nc"，強制使用 CHECKS.nc
+  let fn = null;
+  
+  // 先嘗試直接查找
+  if (CHECKS[activeKey] && typeof CHECKS[activeKey] === "function") {
+    fn = CHECKS[activeKey];
+  }
+  // ✅ 如果找不到且 activeKey 是 "nc"，強制使用 CHECKS.nc（確保 Normal Capacity 能執行）
+  else if (activeKey === "nc" && CHECKS.nc && typeof CHECKS.nc === "function") {
+    fn = CHECKS.nc;
+  }
+  
+  // 如果還是找不到，顯示錯誤
   if (typeof fn !== "function") {
-    // ✅ Normal Capacity 的 key 對應表（包含可能的別名）
-    const NORMAL_CAPACITY_KEYS = ["nc", "normal_capacity", "Normal Capacity", "正常產能", "tabNC"];
-    
-    // 檢查 activeKey 是否為 Normal Capacity 的別名
-    if (NORMAL_CAPACITY_KEYS.includes(activeKey) && typeof CHECKS.nc === "function") {
-      fn = CHECKS.nc;
-    } else {
-      // ✅ 明確列出目前 activeKey 的實際值（用於診斷）
-      setCheckStatusForCurrentSheet(
-        "warn",
-        "Check",
-        (lang==="en"
-          ? `No check rules for this sheet. activeKey="${activeKey}" (type: ${typeof activeKey}). Available keys: ${Object.keys(CHECKS).join(", ")}`
-          : `此分頁尚未設定檢查規則。activeKey="${activeKey}" (類型: ${typeof activeKey})。可用 keys: ${Object.keys(CHECKS).join(", ")}`
-        )
-      );
-      return;
-    }
+    setCheckStatusForCurrentSheet(
+      "warn",
+      "Check",
+      (lang==="en"
+        ? `No check rules for this sheet: ${activeKey}`
+        : `此分頁尚未設定檢查規則：${activeKey}`
+      )
+    );
+    return;
   }
 
   const res = fn();
@@ -1402,8 +1403,45 @@ function runChecksForActiveSheet(){
     if (checkBtn.__checkBound) return true;
     checkBtn.__checkBound = true;
     
-    // 綁定 Check 按鈕
-    onFn("checkBtn", "click", runChecksForActiveSheet);
+    // ✅ 綁定 Check 按鈕：在 Normal Capacity 分頁直接呼叫 CHECKS_BY_SHEET["nc"]()
+    onFn("checkBtn", "click", function(){
+      // ✅ 檢查是否在 Normal Capacity 分頁
+      if (typeof activeKey !== "undefined" && activeKey === "nc") {
+        // ✅ 直接呼叫 window.CHECKS_BY_SHEET["nc"]()
+        const CHECKS = window.CHECKS_BY_SHEET;
+        if (CHECKS && CHECKS.nc && typeof CHECKS.nc === "function") {
+          const res = CHECKS.nc();
+          // ✅ 處理結果並顯示 UI
+          if (res && typeof res === "object") {
+            if (res.ok) {
+              setCheckStatusForCurrentSheet(
+                res.type || "ok",
+                "Check",
+                res.msg || (lang==="en" ? "✅ Check passed." : "✅ 檢查通過。")
+              );
+            } else {
+              setCheckStatusForCurrentSheet(
+                res.type || "err",
+                "Check",
+                res.msg || (lang==="en" ? "⚠️ Check failed." : "⚠️ 檢查未通過。")
+              );
+              if (res.goto && typeof gotoCell === "function") {
+                gotoCell(res.goto);
+              }
+            }
+          } else {
+            setCheckStatusForCurrentSheet(
+              "ok",
+              "Check",
+              (lang==="en" ? "✅ Check passed." : "✅ 檢查通過。")
+            );
+          }
+          return;
+        }
+      }
+      // ✅ 其他分頁使用原本的 runChecksForActiveSheet
+      runChecksForActiveSheet();
+    });
     return true;
   }
   
