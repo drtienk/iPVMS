@@ -43,13 +43,13 @@ console.log("✅ [19] app_init loaded");
       setTimeout(insertBadge, 10);
     }
     
-    // ✅ 全域點擊捕捉：更新 badge 為 "CLICKED"
+    // ✅ 全域點擊監聽：更新 badge 為 "CLICKED"（使用 bubble phase，已移除 capture phase）
     document.addEventListener("click", function(e){
       const badgeEl = document.getElementById("dbgBadge");
       if (badgeEl) {
         badgeEl.textContent = "DEBUG: CLICKED";
       }
-    }, true); // capture=true 捕捉階段
+    }, false); // bubble phase (capture phase removed to avoid conflicts with Check button binding)
   }
   
   // 在 DOMContentLoaded 時建立
