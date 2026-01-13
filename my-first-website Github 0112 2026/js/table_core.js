@@ -1,10 +1,14 @@
+// js/table_core.js
+// ======================= BLOCK: 00_FILE_HEADER START =======================
 console.log("✅ [table_core.js] loaded");
 
 window.DEFS = window.DEFS || {};
 window.DEFS.TABLE_CORE = window.DEFS.TABLE_CORE || {};
+// ======================= BLOCK: 00_FILE_HEADER END =======================
 
 (function installTableCore(){
 
+  // ======================= BLOCK: 01_INIT_WRAPPER START =======================
   window.DEFS.TABLE_CORE.init = function initTableCore(ctx){
     ctx = ctx || {};
     console.log("✅ [table_core.js] init");
@@ -12,8 +16,10 @@ window.DEFS.TABLE_CORE = window.DEFS.TABLE_CORE || {};
     // ---------- state (global compatible) ----------
     window.__CELL_EDIT_MODE = window.__CELL_EDIT_MODE || false;
     window.__EDIT_CELL_KEY  = window.__EDIT_CELL_KEY  || "";
+  // ======================= BLOCK: 01_INIT_WRAPPER END =======================
 
-    // ---------- helpers ----------
+
+    // ======================= BLOCK: 02_HELPERS_START =======================
     function ensureSize(sheet) {
       while (sheet.data.length < sheet.rows) sheet.data.push(Array(sheet.cols).fill(""));
       for (let r=0; r<sheet.data.length; r++) while (sheet.data[r].length < sheet.cols) sheet.data[r].push("");
@@ -69,22 +75,28 @@ window.DEFS.TABLE_CORE = window.DEFS.TABLE_CORE || {};
 
     function focusCell(r, c) {
       const gridBody = (ctx && ctx.gridBody) ? ctx.gridBody : document.getElementById("gridBody");
-
       const td = gridBody?.querySelector?.(`td[data-r="${r}"][data-c="${c}"]`);
       if (!td) return false;
       td.focus();
       return true;
     }
 
-    // ---------- bind events (moved from app.js MODULE 12) ----------
+    function syncDelColBtn(){
+      try{
+        window.DEFS?.TOOLBAR_OPS?.syncDelColBtnVisibility?.();
+      } catch {}
+    }
+    // ======================= BLOCK: 02_HELPERS_END =======================
+
+
+    // ======================= BLOCK: 03_BIND_EVENTS_START =======================
     function bindTableEvents(){
-  const gridBody = (ctx && ctx.gridBody) ? ctx.gridBody : document.getElementById("gridBody");
-  if (!gridBody) return;
+      const gridBody = (ctx && ctx.gridBody) ? ctx.gridBody : document.getElementById("gridBody");
+      if (!gridBody) return;
 
-  // ✅ global guard（不綁第二次）
-  if (window.__TABLE_CORE_EVENTS_BOUND__) return;
-  window.__TABLE_CORE_EVENTS_BOUND__ = true;
-
+      // ✅ global guard（不綁第二次）
+      if (window.__TABLE_CORE_EVENTS_BOUND__) return;
+      window.__TABLE_CORE_EVENTS_BOUND__ = true;
 
       // click: edit mode toggle
       gridBody.addEventListener("click", (e) => {
@@ -130,6 +142,9 @@ window.DEFS.TABLE_CORE = window.DEFS.TABLE_CORE || {};
         ensureSize(s);
         s.data[r][c] = tEl.textContent ?? "";
         if (typeof ctx.saveToLocalByMode === "function") ctx.saveToLocalByMode(ctx.activeMode);
+
+        // 這裡順便同步一次（保險）
+        syncDelColBtn();
       });
 
       // paste: edit mode -> native, else block paste
@@ -158,6 +173,8 @@ window.DEFS.TABLE_CORE = window.DEFS.TABLE_CORE || {};
         const needCols = startC + Math.max(...block.map(row => row.length));
 
         if (needRows > s.rows) s.rows = needRows;
+
+        // ✅ 會自動擴欄：這就是你現在遇到的情境
         if (needCols > s.cols) s.cols = needCols;
 
         if (typeof ctx.ensureHeadersForActiveSheet === "function") ctx.ensureHeadersForActiveSheet();
@@ -167,12 +184,20 @@ window.DEFS.TABLE_CORE = window.DEFS.TABLE_CORE || {};
           for (let c=0; c<block[r].length; c++) s.data[startR + r][startC + c] = block[r][c] ?? "";
         }
 
-        const doRender = (typeof ctx.render === "function") ? ctx.render : (typeof window.render === "function" ? window.render : null);
+        const doRender = (typeof ctx.render === "function")
+          ? ctx.render
+          : (typeof window.render === "function" ? window.render : null);
+
         if (doRender) doRender();
+
+        // ✅ 關鍵：貼上擴欄後，立刻同步 Delete Column 顯示
+        syncDelColBtn();
 
         focusCell(startR, startC);
         setTimeout(() => {
           if (typeof ctx.saveToLocalByMode === "function") ctx.saveToLocalByMode(ctx.activeMode);
+          // 再保險同步一次
+          syncDelColBtn();
         }, 0);
       });
 
@@ -208,9 +233,14 @@ window.DEFS.TABLE_CORE = window.DEFS.TABLE_CORE || {};
           try { window.setSelection({r:nr, c:nc}, {r:nr, c:nc}); } catch {}
         }
       });
-    }
 
-    // ---------- export to ctx + window (compat) ----------
+      // ✅ 綁完事件後先同步一次（頁面初次載入/切回來）
+      syncDelColBtn();
+    }
+    // ======================= BLOCK: 03_BIND_EVENTS_END =======================
+
+
+    // ======================= BLOCK: 04_EXPORTS_START =======================
     ctx.ensureSize = ensureSize;
     ctx.parseClipboardGrid = parseClipboardGrid;
     ctx.placeCaretFromMouseEvent = placeCaretFromMouseEvent;
@@ -226,11 +256,18 @@ window.DEFS.TABLE_CORE = window.DEFS.TABLE_CORE || {};
     window.exitEditMode = exitEditMode;
     window.focusCell = focusCell;
     window.bindTableEvents = bindTableEvents;
+    // ======================= BLOCK: 04_EXPORTS_END =======================
 
+
+    // ======================= BLOCK: 05_AUTO_BIND_START =======================
     // auto-bind now
     bindTableEvents();
 
+    // init 時也同步一次（保險）
+    syncDelColBtn();
+
     return ctx;
+    // ======================= BLOCK: 05_AUTO_BIND_END =======================
   };
 
 })();
