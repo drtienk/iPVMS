@@ -17,17 +17,30 @@ window._syncDelColBtnVisibility = _syncDelColBtnVisibility;
 
 
 
-(function installToolbarOps(){
-  // ======================= BLOCK: 01_INSTALL_GUARD_START =======================
-  if (window.__TOOLBAR_OPS_INSTALLED__) return;
-  window.__TOOLBAR_OPS_INSTALLED__ = true;
+// ======================= BLOCK: 01_INSTALL_GUARD_START =======================
+if (window.__TOOLBAR_OPS_INSTALLED__) return;
+window.__TOOLBAR_OPS_INSTALLED__ = true;
 
-  let CTX = null;
+let CTX = null;
 
-  function bind(ctx){
-    CTX = ctx || {};
-  }
-  // ======================= BLOCK: 01_INSTALL_GUARD_END =======================
+function bind(ctx){
+  CTX = ctx || {};
+}
+
+// ✅ 先保證全域一定存在（避免 installToolbarOps 內任何地方先呼叫就炸）
+if (typeof window._syncDelColBtnVisibility !== "function") {
+  window._syncDelColBtnVisibility = function(){
+    try{
+      const btn = document.getElementById("delColBtn");
+      if (btn) btn.style.display = "";
+    } catch(_e){}
+  };
+}
+function _syncDelColBtnVisibility(){
+  return window._syncDelColBtnVisibility();
+}
+// ======================= BLOCK: 01_INSTALL_GUARD_END =======================
+
 
 // ======================= BLOCK: 02A_SYNC_DEL_COL_VISIBILITY_START =======================
 function _syncDelColBtnVisibility(){
@@ -453,6 +466,7 @@ window.DEFS.TOOLBAR_OPS.syncDelColBtnVisibility = _syncDelColBtnVisibility;
 
 
 })();
+
 
 
 
