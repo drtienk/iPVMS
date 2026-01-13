@@ -1439,9 +1439,14 @@ const CHECKS_BY_SHEET = {
   nc: function checkNormalCapacityDelegate(){
     const fn = window.DEFS?.CHECKS?.normalCapacity;
     if (typeof fn !== "function") {
-      return { ok:false, type:"err", msg: (lang==="en"
-        ? "Normal Capacity rule not loaded: window.DEFS.CHECKS.normalCapacity"
-        : "Normal Capacity rule not loaded: window.DEFS.CHECKS.normalCapacity") };
+      return {
+        ok:false,
+        type:"err",
+        msg:(lang==="en"
+          ? "Normal Capacity rule not loaded: window.DEFS.CHECKS.normalCapacity"
+          : "Normal Capacity rule not loaded: window.DEFS.CHECKS.normalCapacity"
+        )
+      };
     }
     return fn();
   },
