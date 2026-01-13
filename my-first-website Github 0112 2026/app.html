@@ -58,6 +58,8 @@ SAFE TO REPLACE WHOLE BLOCK
     .tab-group-buttons{ display:flex; gap:8px; flex-wrap:wrap; }
     .tab-btn { background:#e5e7eb; color:#111; border:1px solid #cbd5e1; border-radius:999px; padding:6px 10px; }
     .tab-btn.active { background:var(--primary); color:#fff; border-color:var(--primary); }
+    .tab-btn.tab-checked { font-weight:800; position:relative; }
+    .tab-btn.tab-checked::after { content:" ✓"; color:var(--ok); }
 
     .toolbar { display:flex; gap:8px; flex-wrap:wrap; margin: 10px 0 10px; max-width:var(--maxw); width:100%; }
 
@@ -490,6 +492,9 @@ SAFE TO REPLACE WHOLE BLOCK
 <script src="js/required_fields_guide.js"></script>
 <script src="js/required_legend.js"></script>
 <script src="js/company_row_lock.js"></script>
+
+<!-- ✅ Rules modules (load before custom_rules.js dispatcher) -->
+<script src="js/rules_normal_capacity.js"></script>
 
 <script src="js/custom_rules.js"></script>
 

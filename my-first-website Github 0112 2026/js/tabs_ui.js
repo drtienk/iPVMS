@@ -79,6 +79,14 @@ window.DEFS.TABS_UI = window.DEFS.TABS_UI || {};
 
     ensureActiveKeyVisible();
     Object.keys(tabs).forEach(k => tabs[k]?.classList.toggle("active", k === activeKey));
+
+    // ✅ 更新 Normal Capacity tab 的已檢查狀態
+    try {
+      if (window.DEFS?.CHECKS?.normalCapacityUpdateTabUI) {
+        const checked = sessionStorage.getItem("nc_checked_status") === "1";
+        window.DEFS.CHECKS.normalCapacityUpdateTabUI(checked);
+      }
+    } catch(e) {}
   }
 
   // ✅ export
