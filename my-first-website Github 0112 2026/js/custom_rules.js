@@ -169,19 +169,18 @@ console.log("custom_rules.js loaded - v2026-01-10a");
 ========================= */
 
  /* =========================================================
-  MODULE: 15C_TOOLBAR_VISIBILITY (UPDATED)
+  MODULE: 15C_TOOLBAR_VISIBILITY (SIMPLE)
   AREA: keep toolbar only 3 buttons; others hidden
-        BUT: Delete Column appears ONLY when user used Add Column
+        AND: Delete Column ALWAYS visible (never auto-hide)
   RULE:
-    - delColBtn visible only if:
-       1) activeSheet().__userAddedCols === true
-       2) cols > minCols
-       3) addColBtn is not disabled
+    - delColBtn 永遠顯示
+    - 能不能刪 / 到最小提示 => 交給 toolbar_ops.js 的 click handler 處理
   SAFE TO REPLACE WHOLE MODULE
 ========================================================= */
+// ======================= MODULE 15C_TOOLBAR_VISIBILITY START =======================
 (function toolbarVisibilityGuard(){
 
-  const KEEP_VISIBLE = new Set(["addRowBtn","addColBtn","checkBtn"]);
+  const KEEP_VISIBLE = new Set(["addRowBtn","addColBtn","checkBtn","delColBtn"]); // ✅ 把 delColBtn 加進來
   const HIDE_IDS = [
     "exportCsvBtn",
     "exportXlsxBtn",
@@ -204,38 +203,16 @@ console.log("custom_rules.js loaded - v2026-01-10a");
     el.style.display = "";
   }
 
-  function shouldShowDelCol(){
-    const delBtn = document.getElementById("delColBtn");
-    if (!delBtn) return false;
-
-    const addColBtn = document.getElementById("addColBtn");
-    if (addColBtn && addColBtn.disabled) return false;
-
-    try{
-      if (typeof activeSheet !== "function") return false;
-      const s = activeSheet();
-      if (!s) return false;
-
-      // ✅ 핵심：只有按過「Add Column」才顯示
-      if (s.__userAddedCols !== true) return false;
-
-      const minCols = (typeof minColsForActiveSheet === "function") ? minColsForActiveSheet() : 1;
-      const cols = Number(s.cols || 0);
-
-      return cols > Number(minCols || 0);
-    } catch {
-      return false;
-    }
-  }
-
   function applyToolbarVisibility(){
+    // hide the ones you don't want
     HIDE_IDS.forEach(hideEl);
+
+    // show the ones you keep (including Delete Column)
     KEEP_VISIBLE.forEach(showEl);
 
+    // ✅ 再保險：永遠顯示 delColBtn（不要再被藏）
     const delBtn = document.getElementById("delColBtn");
-    if (delBtn){
-      delBtn.style.display = shouldShowDelCol() ? "" : "none";
-    }
+    if (delBtn) delBtn.style.display = "";
   }
 
   window.addEventListener("DOMContentLoaded", () => {
@@ -244,6 +221,7 @@ console.log("custom_rules.js loaded - v2026-01-10a");
     setTimeout(applyToolbarVisibility, 300);
   });
 
+  // Hook refreshUI/render: keep it visible even after UI refresh
   const _refreshUI = window.refreshUI;
   if (typeof _refreshUI === "function") {
     window.refreshUI = function(){
@@ -262,17 +240,20 @@ console.log("custom_rules.js loaded - v2026-01-10a");
     };
   }
 
+  // ✅ still keep other buttons hidden, but NEVER hide delColBtn
   setInterval(() => {
     for (const id of HIDE_IDS){
       const el = document.getElementById(id);
       if (el && el.style.display !== "none") hideEl(id);
     }
+    // ✅ keep Delete Column always visible
     const delBtn = document.getElementById("delColBtn");
-    if (delBtn) delBtn.style.display = shouldShowDelCol() ? "" : "none";
+    if (delBtn) delBtn.style.display = "";
   }, 800);
 
 })();
-  /* ======================= END  MODULE: 15C_TOOLBAR_VISIBILITY ======================= */
+// ======================= MODULE 15C_TOOLBAR_VISIBILITY END =======================
+
 
 
   /* =========================================================
@@ -1295,3 +1276,4 @@ on("checkBtn","click", runChecksForActiveSheet);
 })();
 
 /* ======================= END MODULE: 15A_CHECKS ======================= */
+
