@@ -81,10 +81,70 @@ window.DEFS.TABLE_CORE = window.DEFS.TABLE_CORE || {};
       return true;
     }
 
-    function syncDelColBtn(){
+    // ✅ 你的原本：呼叫 toolbar_ops（但可能拿不到/被蓋回）
+    function syncDelColBtnViaToolbarOps(){
       try{
         window.DEFS?.TOOLBAR_OPS?.syncDelColBtnVisibility?.();
       } catch {}
+    }
+
+    // ✅ 硬保底：不靠 toolbar_ops，直接用 def.cols 計算並控制 #delColBtn 顯示
+    function _getActiveMode(){
+      return String(
+        (ctx && ctx.activeMode) ||
+        window.activeMode ||
+        "model"
+      );
+    }
+    function _getActiveKey(){
+      return String(
+        (ctx && ctx.activeKey) ||
+        window.activeKey ||
+        "company"
+      );
+    }
+    function _getDefCols(){
+      const mode = _getActiveMode() === "period" ? "period" : "model";
+      const key  = _getActiveKey();
+
+      const modelMap =
+        (ctx && ctx.MODEL_DEF_MAP) ||
+        window.MODEL_DEF_MAP ||
+        window.DEFS?.MODEL_DEF_MAP ||
+        {};
+
+      const periodMap =
+        (ctx && ctx.PERIOD_DEF_MAP) ||
+        window.PERIOD_DEF_MAP ||
+        window.DEFS?.PERIOD_DEF_MAP ||
+        {};
+
+      const map = (mode === "period") ? periodMap : modelMap;
+      const def = map?.[key];
+      const cols = Number(def?.cols);
+      return (Number.isFinite(cols) && cols > 0) ? cols : 1;
+    }
+
+    function syncDelColBtnHard(){
+      try{
+        const btn = document.getElementById("delColBtn");
+        if (!btn) return;
+
+        const s = (typeof ctx.activeSheet === "function")
+          ? ctx.activeSheet()
+          : (typeof window.activeSheet === "function" ? window.activeSheet() : null);
+
+        if (!s) { btn.style.display = "none"; return; }
+
+        const minCols = _getDefCols();
+        btn.style.display = (Number(s.cols || 0) > Number(minCols || 0)) ? "" : "none";
+      } catch {}
+    }
+
+    // ✅ 統一入口：兩種都呼叫（先硬保底，再給 toolbar_ops 機會）
+    function syncDelColBtnAll(){
+      syncDelColBtnHard();
+      syncDelColBtnViaToolbarOps();
     }
     // ======================= BLOCK: 02_HELPERS_END =======================
 
@@ -143,8 +203,8 @@ window.DEFS.TABLE_CORE = window.DEFS.TABLE_CORE || {};
         s.data[r][c] = tEl.textContent ?? "";
         if (typeof ctx.saveToLocalByMode === "function") ctx.saveToLocalByMode(ctx.activeMode);
 
-        // 這裡順便同步一次（保險）
-        syncDelColBtn();
+        // ✅ 保險：每次輸入也同步一次（不影響功能）
+        syncDelColBtnAll();
       });
 
       // paste: edit mode -> native, else block paste
@@ -173,8 +233,6 @@ window.DEFS.TABLE_CORE = window.DEFS.TABLE_CORE || {};
         const needCols = startC + Math.max(...block.map(row => row.length));
 
         if (needRows > s.rows) s.rows = needRows;
-
-        // ✅ 會自動擴欄：這就是你現在遇到的情境
         if (needCols > s.cols) s.cols = needCols;
 
         if (typeof ctx.ensureHeadersForActiveSheet === "function") ctx.ensureHeadersForActiveSheet();
@@ -190,14 +248,14 @@ window.DEFS.TABLE_CORE = window.DEFS.TABLE_CORE || {};
 
         if (doRender) doRender();
 
-        // ✅ 關鍵：貼上擴欄後，立刻同步 Delete Column 顯示
-        syncDelColBtn();
+        // ✅ 關鍵：貼上擴欄後立刻同步（硬保底 + toolbar_ops）
+        syncDelColBtnAll();
 
         focusCell(startR, startC);
         setTimeout(() => {
           if (typeof ctx.saveToLocalByMode === "function") ctx.saveToLocalByMode(ctx.activeMode);
           // 再保險同步一次
-          syncDelColBtn();
+          syncDelColBtnAll();
         }, 0);
       });
 
@@ -235,7 +293,7 @@ window.DEFS.TABLE_CORE = window.DEFS.TABLE_CORE || {};
       });
 
       // ✅ 綁完事件後先同步一次（頁面初次載入/切回來）
-      syncDelColBtn();
+      syncDelColBtnAll();
     }
     // ======================= BLOCK: 03_BIND_EVENTS_END =======================
 
@@ -264,7 +322,7 @@ window.DEFS.TABLE_CORE = window.DEFS.TABLE_CORE || {};
     bindTableEvents();
 
     // init 時也同步一次（保險）
-    syncDelColBtn();
+    syncDelColBtnAll();
 
     return ctx;
     // ======================= BLOCK: 05_AUTO_BIND_END =======================
