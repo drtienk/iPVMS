@@ -1353,8 +1353,12 @@ function runChecksForActiveSheet(){
     fn = CHECKS.nc;
   }
   
-  // 如果還是找不到，顯示錯誤
+  // 如果還是找不到，顯示錯誤（但 Normal Capacity 已在 handler 中處理，這裡不顯示錯誤）
   if (typeof fn !== "function") {
+    // ✅ Normal Capacity (nc) 已在 Check handler 中直接處理，這裡不顯示錯誤
+    if (activeKey === "nc") {
+      return; // 靜默返回，不顯示錯誤訊息
+    }
     setCheckStatusForCurrentSheet(
       "warn",
       "Check",
