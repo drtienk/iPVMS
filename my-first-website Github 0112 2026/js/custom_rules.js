@@ -75,7 +75,7 @@ console.log("🔥🔥🔥 LOADED custom_rules.js VERSION = 2026-01-13 STEP5-NC-D
   console.log("✅ [custom_rules] Debug badge installed");
 })();
 
-console.log("custom_rules.js loaded - v2026-01-10a");
+
 
 // ✅ HARD-REGISTER: ensure window.CHECKS_BY_SHEET has keys
 window.CHECKS_BY_SHEET = window.CHECKS_BY_SHEET || {};
@@ -1829,6 +1829,7 @@ window.runChecksForActiveSheet = runChecksForActiveSheet;
 
 })();
  /* ======================= END MODULE: 12J_NC_REQUIRED_ROW1_ONLY ======================= */
+
 
 
 
