@@ -222,10 +222,49 @@ window.DEFS.SELECTION_EVENTS = window.DEFS.SELECTION_EVENTS || {};
       }
     }
 
+    // ✅ NEW: sync Delete Column button (hard fallback)
+    function _getActiveMode(){
+      return String(window.activeMode || "model");
+    }
+    function _getActiveKey(){
+      return String(window.activeKey || "company");
+    }
+    function _getDefCols(){
+      const mode = (_getActiveMode() === "period") ? "period" : "model";
+      const key  = _getActiveKey();
+
+      const modelMap  = window.MODEL_DEF_MAP  || window.DEFS?.MODEL_DEF_MAP  || {};
+      const periodMap = window.PERIOD_DEF_MAP || window.DEFS?.PERIOD_DEF_MAP || {};
+      const map = (mode === "period") ? periodMap : modelMap;
+
+      const cols = Number(map?.[key]?.cols);
+      return (Number.isFinite(cols) && cols > 0) ? cols : 1;
+    }
+
+    function syncDelColBtnAll(){
+      // 1) call toolbar_ops (if exists)
+      try{ window.DEFS?.TOOLBAR_OPS?.syncDelColBtnVisibility?.(); } catch {}
+
+      // 2) hard fallback: control #delColBtn directly
+      try{
+        const btn = document.getElementById("delColBtn");
+        if (!btn) return;
+
+        const s = (typeof window.activeSheet === "function") ? window.activeSheet() : null;
+        if (!s) { btn.style.display = "none"; return; }
+
+        const minCols = _getDefCols();
+        btn.style.display = (Number(s.cols || 0) > Number(minCols || 0)) ? "" : "none";
+      } catch {}
+    }
+
     function afterApply(){
       try{ if (typeof window.render === "function") window.render(); }catch{}
       safeApplySelectionDOM();
       clearCaret();
+
+      // ✅ KEY: paste/undo/redo/cut/clear 後都同步 Delete Column 顯示
+      syncDelColBtnAll();
     }
 
     function doUndo(){
@@ -766,6 +805,8 @@ window.DEFS.SELECTION_EVENTS = window.DEFS.SELECTION_EVENTS || {};
     setTimeout(() => {
       safeApplySelectionDOM();
       clearCaret();
+      // ✅ 初次也同步一次
+      try{ syncDelColBtnAll(); } catch {}
     }, 0);
     // ==================== BLOCK 14_INIT_VISUAL END ====================
 
