@@ -1,3 +1,5 @@
+console.log("🔥🔥🔥 LOADED custom_rules.js VERSION = 2026-01-13 STEP5-NC-DELEGATE");
+
 /* =========================================================
   FILE: custom_rules.js
   檔案：custom_rules.js
@@ -1815,6 +1817,7 @@ window.runChecksForActiveSheet = runChecksForActiveSheet;
 
 })();
  /* ======================= END MODULE: 12J_NC_REQUIRED_ROW1_ONLY ======================= */
+
 
 
 
