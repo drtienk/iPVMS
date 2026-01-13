@@ -696,10 +696,145 @@ function clearCheckStatusForCurrentSheet(){
 }
 
 function applyCheckStatusVisibility(){
-  const box = document.getElementById("checkStatus");
-  const tEl = document.getElementById("checkStatusTitle");
-  const mEl = document.getElementById("checkStatusMsg");
-  if (!box || !tEl || !mEl) return;
+  let box = document.getElementById("checkStatus");
+  let tEl = document.getElementById("checkStatusTitle");
+  let mEl = document.getElementById("checkStatusMsg");
+  
+  // ✅ 如果找不到元素，動態建立狀態框
+  if (!box || !tEl || !mEl) {
+    // 尋找插入位置：優先插入在 toolbar 之前，否則插入在 body 最上方
+    const toolbar = document.querySelector(".toolbar");
+    const insertBefore = toolbar || document.body.firstChild;
+    const parent = toolbar ? toolbar.parentElement : document.body;
+    
+    // 建立外層容器
+    if (!box) {
+      box = document.createElement("div");
+      box.id = "checkStatus";
+      box.className = "panel";
+      box.style.display = "none";
+      box.style.marginTop = "10px";
+      box.style.padding = "12px";
+      box.style.border = "2px solid";
+      box.style.borderRadius = "6px";
+      
+      // 建立內部結構
+      const innerDiv = document.createElement("div");
+      innerDiv.style.display = "flex";
+      innerDiv.style.justifyContent = "space-between";
+      innerDiv.style.alignItems = "flex-start";
+      innerDiv.style.gap = "10px";
+      
+      const contentDiv = document.createElement("div");
+      
+      // 建立標題元素
+      if (!tEl) {
+        tEl = document.createElement("div");
+        tEl.id = "checkStatusTitle";
+        tEl.style.fontWeight = "800";
+        tEl.style.marginBottom = "6px";
+        contentDiv.appendChild(tEl);
+      }
+      
+      // 建立訊息元素
+      if (!mEl) {
+        mEl = document.createElement("div");
+        mEl.id = "checkStatusMsg";
+        mEl.style.whiteSpace = "pre-wrap";
+        mEl.style.lineHeight = "1.7";
+        contentDiv.appendChild(mEl);
+      }
+      
+      innerDiv.appendChild(contentDiv);
+      
+      // 建立關閉按鈕
+      const closeBtn = document.getElementById("checkStatusClose");
+      if (!closeBtn) {
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.id = "checkStatusClose";
+        btn.className = "btn-gray";
+        btn.style.padding = "6px 10px";
+        btn.textContent = (typeof lang !== "undefined" && lang === "en") ? "Close" : "關閉";
+        innerDiv.appendChild(btn);
+        
+        // 綁定關閉按鈕事件
+        btn.addEventListener("click", clearCheckStatusForCurrentSheet);
+      } else {
+        innerDiv.appendChild(closeBtn);
+      }
+      
+      box.appendChild(innerDiv);
+      
+      // 插入到頁面
+      if (insertBefore && parent) {
+        parent.insertBefore(box, insertBefore);
+      } else {
+        document.body.insertBefore(box, document.body.firstChild);
+      }
+      
+      // 重新取得元素（確保是 DOM 中的元素）
+      box = document.getElementById("checkStatus");
+      tEl = document.getElementById("checkStatusTitle");
+      mEl = document.getElementById("checkStatusMsg");
+    } else {
+      // 如果 box 存在但內部元素不存在，建立內部元素
+      // 先檢查 box 內部是否已有結構
+      let innerDiv = box.querySelector("div[style*='display:flex']");
+      if (!innerDiv) {
+        innerDiv = document.createElement("div");
+        innerDiv.style.display = "flex";
+        innerDiv.style.justifyContent = "space-between";
+        innerDiv.style.alignItems = "flex-start";
+        innerDiv.style.gap = "10px";
+        box.appendChild(innerDiv);
+      }
+      
+      let contentDiv = innerDiv.querySelector("div:first-child");
+      if (!contentDiv) {
+        contentDiv = document.createElement("div");
+        innerDiv.insertBefore(contentDiv, innerDiv.firstChild);
+      }
+      
+      if (!tEl) {
+        tEl = document.createElement("div");
+        tEl.id = "checkStatusTitle";
+        tEl.style.fontWeight = "800";
+        tEl.style.marginBottom = "6px";
+        contentDiv.appendChild(tEl);
+      }
+      if (!mEl) {
+        mEl = document.createElement("div");
+        mEl.id = "checkStatusMsg";
+        mEl.style.whiteSpace = "pre-wrap";
+        mEl.style.lineHeight = "1.7";
+        contentDiv.appendChild(mEl);
+      }
+      
+      // 確保關閉按鈕存在
+      let closeBtn = document.getElementById("checkStatusClose");
+      if (!closeBtn) {
+        closeBtn = document.createElement("button");
+        closeBtn.type = "button";
+        closeBtn.id = "checkStatusClose";
+        closeBtn.className = "btn-gray";
+        closeBtn.style.padding = "6px 10px";
+        closeBtn.textContent = (typeof lang !== "undefined" && lang === "en") ? "Close" : "關閉";
+        innerDiv.appendChild(closeBtn);
+        closeBtn.addEventListener("click", clearCheckStatusForCurrentSheet);
+      }
+      
+      // 重新取得元素
+      tEl = document.getElementById("checkStatusTitle");
+      mEl = document.getElementById("checkStatusMsg");
+    }
+    
+    // 如果還是找不到，直接返回（不應該發生）
+    if (!box || !tEl || !mEl) {
+      console.warn("Failed to create checkStatus elements");
+      return;
+    }
+  }
 
   const k = _statusKey(activeMode, activeKey);
   const item = CHECK_STATUS_STORE[k];
