@@ -1,10 +1,13 @@
 // js/toolbar_ops.js
+// ======================= BLOCK: 00_FILE_HEADER START =======================
 console.log("✅ [toolbar_ops.js] loaded");
 
 window.DEFS = window.DEFS || {};
 window.DEFS.TOOLBAR_OPS = window.DEFS.TOOLBAR_OPS || {};
+// ======================= BLOCK: 00_FILE_HEADER END =======================
 
 (function installToolbarOps(){
+  // ======================= BLOCK: 01_INSTALL_GUARD_START =======================
   if (window.__TOOLBAR_OPS_INSTALLED__) return;
   window.__TOOLBAR_OPS_INSTALLED__ = true;
 
@@ -13,7 +16,10 @@ window.DEFS.TOOLBAR_OPS = window.DEFS.TOOLBAR_OPS || {};
   function bind(ctx){
     CTX = ctx || {};
   }
+  // ======================= BLOCK: 01_INSTALL_GUARD_END =======================
 
+
+  // ======================= BLOCK: 02_HELPERS_START =======================
   function _roleIsAdminFallback(){
     const role = String(sessionStorage.getItem("role") || "user").toLowerCase();
     return role === "admin";
@@ -24,6 +30,20 @@ window.DEFS.TOOLBAR_OPS = window.DEFS.TOOLBAR_OPS || {};
     const map = (activeMode === "period") ? PERIOD_DEF_MAP : MODEL_DEF_MAP;
     const def = map?.[activeKey];
     return def?.cols ?? 1;
+  }
+
+  function _syncDelColBtnVisibility(){
+    // 規則：只要目前 cols > 該 sheet 的 def.cols，就顯示 Delete Column
+    if (!CTX) return;
+    const $ = CTX.$ || ((id)=>document.getElementById(id));
+    const btn = $("delColBtn");
+    if (!btn) return;
+
+    const s = (typeof CTX.activeSheet === "function") ? CTX.activeSheet() : null;
+    if (!s) { btn.style.display = "none"; return; }
+
+    const minCols = _minColsForActiveSheet();
+    btn.style.display = (Number(s.cols || 0) > Number(minCols || 0)) ? "" : "none";
   }
 
   function _makeSafeSheetName(name, used) {
@@ -66,7 +86,10 @@ window.DEFS.TOOLBAR_OPS = window.DEFS.TOOLBAR_OPS || {};
     }
     return aoa;
   }
+  // ======================= BLOCK: 02_HELPERS_END =======================
 
+
+  // ======================= BLOCK: 03_BIND_TOOLBAR_EVENTS_START =======================
   function bindToolbarEvents(){
     if (!CTX) return;
     if (bindToolbarEvents.__bound) return;
@@ -91,6 +114,7 @@ window.DEFS.TOOLBAR_OPS = window.DEFS.TOOLBAR_OPS || {};
       activeSheet().rows += 1;
       render();
       saveToLocalByMode(CTX.activeMode);
+      _syncDelColBtnVisibility();
     });
 
     // -------------------------
@@ -107,8 +131,7 @@ window.DEFS.TOOLBAR_OPS = window.DEFS.TOOLBAR_OPS || {};
       render();
       saveToLocalByMode(CTX.activeMode);
 
-      const delBtn = $("delColBtn");
-      if (delBtn) delBtn.style.display = "";
+      _syncDelColBtnVisibility();
     });
 
     // -------------------------
@@ -117,7 +140,7 @@ window.DEFS.TOOLBAR_OPS = window.DEFS.TOOLBAR_OPS || {};
     on("delColBtn","click", () => {
       const s = activeSheet();
       const minCols = _minColsForActiveSheet();
-      if (s.cols <= minCols) { alert(t("alert_min_cols")(minCols)); return; }
+      if (s.cols <= minCols) { alert(t("alert_min_cols")(minCols)); _syncDelColBtnVisibility(); return; }
 
       s.cols -= 1;
       if (Array.isArray(s.headers)) s.headers.length = s.cols;
@@ -135,9 +158,11 @@ window.DEFS.TOOLBAR_OPS = window.DEFS.TOOLBAR_OPS || {};
       render();
       saveToLocalByMode(CTX.activeMode);
 
-      const delBtn = $("delColBtn");
-      if (delBtn && s.cols <= minCols) delBtn.style.display = "none";
+      _syncDelColBtnVisibility();
     });
+
+    // ✅ 開機先同步一次（避免一開始按鈕狀態不對）
+    try { _syncDelColBtnVisibility(); } catch {}
 
     // -------------------------
     // Export CSV (NO row-number column)
@@ -190,7 +215,6 @@ window.DEFS.TOOLBAR_OPS = window.DEFS.TOOLBAR_OPS || {};
             : "請先建立或選擇一個 Period（yyyy-mm）再匯出。"
           );
           (window.DEFS?.PERIOD_UI?.openPeriodModal || openPeriodModal)?.();
-
           return;
         }
 
@@ -230,28 +254,18 @@ window.DEFS.TOOLBAR_OPS = window.DEFS.TOOLBAR_OPS || {};
         if (el && el.parentNode) el.parentNode.removeChild(el);
       }
 
-      // ✅ 抓到任何 select，把 JSON 匯出/匯入兩個 option 直接刪掉
       function scrubJsonOptionsEverywhere(){
         const selects = Array.from(document.querySelectorAll("select"));
 
         const shouldRemoveOption = (opt) => {
           const v  = String(opt?.value || "").toLowerCase().trim();
           const tx = String(opt?.text  || opt?.textContent || "").toLowerCase().trim();
-
-          // value 精準命中（你現在就是 export_json / import_json）
           if (v === "export_json" || v === "import_json") return true;
-
-          // 有些版本可能沒有底線
           if (v === "exportjson" || v === "importjson") return true;
-
-          // 文字命中
           if (tx.includes("export json")) return true;
           if (tx.includes("import json")) return true;
-
-          // 你這兩個選項的括號描述
           if (tx.includes("workspace snapshot")) return true;
           if (tx.includes("load workspace snapshot")) return true;
-
           return false;
         };
 
@@ -267,7 +281,6 @@ window.DEFS.TOOLBAR_OPS = window.DEFS.TOOLBAR_OPS || {};
             }
           });
 
-          // 如果剛好移除後選到空/不存在，保險：選第一個可用的
           if (removed) {
             const first = Array.from(sel.options || [])[0];
             if (first) sel.value = first.value;
@@ -276,10 +289,8 @@ window.DEFS.TOOLBAR_OPS = window.DEFS.TOOLBAR_OPS || {};
       }
 
       function startHardScrub(){
-        // 立刻 scrub 一次
         scrubJsonOptionsEverywhere();
 
-        // 1) MutationObserver：任何 DOM 更新都再 scrub
         if (!window.__JSON_SCRUB_OBS__) {
           window.__JSON_SCRUB_OBS__ = true;
           const obs = new MutationObserver(() => {
@@ -288,26 +299,23 @@ window.DEFS.TOOLBAR_OPS = window.DEFS.TOOLBAR_OPS || {};
           obs.observe(document.documentElement, { childList:true, subtree:true });
         }
 
-        // 2) 短時間 interval：防止某些程式「重建 select」但 observer 沒抓到的邊界狀況
         if (!window.__JSON_SCRUB_TIMER__) {
           let n = 0;
           window.__JSON_SCRUB_TIMER__ = setInterval(() => {
             n++;
             scrubJsonOptionsEverywhere();
-            if (n >= 60) { // 約 6 秒
+            if (n >= 60) {
               clearInterval(window.__JSON_SCRUB_TIMER__);
               window.__JSON_SCRUB_TIMER__ = null;
             }
           }, 100);
         }
 
-        // 3) 再補幾次延遲 scrub（保險）
         setTimeout(scrubJsonOptionsEverywhere, 300);
         setTimeout(scrubJsonOptionsEverywhere, 1200);
         setTimeout(scrubJsonOptionsEverywhere, 2500);
       }
 
-      // ===== USER：移除 JSON UI + 強制把下拉選單的 JSON option 拔掉 =====
       if (!admin) {
         removeEl("exportJsonBtn");
         removeEl("importJsonBtn");
@@ -316,9 +324,6 @@ window.DEFS.TOOLBAR_OPS = window.DEFS.TOOLBAR_OPS || {};
         return;
       }
 
-      // ===== ADMIN：正常保留 JSON 功能 =====
-
-      // Export JSON
       on("exportJsonBtn","click", () => {
         try {
           if (CTX.activeMode === "period" && !CTX.activePeriod) {
@@ -353,7 +358,6 @@ window.DEFS.TOOLBAR_OPS = window.DEFS.TOOLBAR_OPS || {};
         } catch (err) { showErr(err); }
       });
 
-      // Import JSON
       on("importJsonBtn","click", () => {
         const inp = $("importJsonFile");
         if (!inp) return;
@@ -418,11 +422,19 @@ window.DEFS.TOOLBAR_OPS = window.DEFS.TOOLBAR_OPS || {};
         refreshUI();
         setActive(CTX.activeKey);
 
+        _syncDelColBtnVisibility();
       } catch (err) { showErr(err); }
     });
   }
+  // ======================= BLOCK: 03_BIND_TOOLBAR_EVENTS_END =======================
 
+
+  // ======================= BLOCK: 04_EXPORTS_START =======================
   window.DEFS.TOOLBAR_OPS.bind = bind;
   window.DEFS.TOOLBAR_OPS.bindToolbarEvents = bindToolbarEvents;
+
+  // 給其他模組（例如 paste handler）呼叫用：貼上擴欄後可立刻同步按鈕顯示
+  window.DEFS.TOOLBAR_OPS.syncDelColBtnVisibility = _syncDelColBtnVisibility;
+  // ======================= BLOCK: 04_EXPORTS_END =======================
 
 })();
