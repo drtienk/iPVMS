@@ -1277,3 +1277,162 @@ on("checkBtn","click", runChecksForActiveSheet);
 
 /* ======================= END MODULE: 15A_CHECKS ======================= */
 
+/* =========================================================
+  MODULE: 12J_NC_REQUIRED_ROW1_ONLY
+  AREA: Model > Normal Capacity (key: nc)
+  GOAL:
+    - 3 columns are required: Activity Code / Activity Name / Description
+    - req-col tint on header + ALL rows
+    - req-missing red outline ONLY on Row 1 (r===0)
+  SAFE TO REPLACE WHOLE MODULE
+========================================================= */
+(function ncRequiredRow1Only(){
+
+  const TARGET_MODE = "model";
+  const TARGET_KEY  = "nc";
+
+  const REQUIRED_HEADERS = [
+    "Activity Code",
+    "Activity Name",
+    "Description"
+  ];
+
+  const TAG_REQ = "nc-req"; // tag so we only touch our own marks
+
+  function norm(s){ return String(s||"").replace(/\s+/g," ").trim(); }
+
+  function isTarget(){
+    try {
+      return (typeof activeMode !== "undefined"
+        && typeof activeKey !== "undefined"
+        && activeMode === TARGET_MODE
+        && activeKey === TARGET_KEY);
+    } catch { return false; }
+  }
+
+  function getSheet(){
+    try { return (typeof activeSheet === "function") ? activeSheet() : null; }
+    catch { return null; }
+  }
+
+  function findColIndexByHeader(sheet, headerName){
+    const target = norm(headerName);
+    const headers = Array.isArray(sheet?.headers) ? sheet.headers : [];
+    for (let i=0; i<headers.length; i++){
+      if (norm(headers[i]) === target) return i;
+    }
+    return -1;
+  }
+
+  function clearMyMarks(){
+    const head = document.getElementById("gridHead");
+    const body = document.getElementById("gridBody");
+    head?.querySelectorAll(`th.${TAG_REQ}`).forEach(el => el.classList.remove("req-col", TAG_REQ));
+    body?.querySelectorAll(`td.${TAG_REQ}`).forEach(el => el.classList.remove("req-col", TAG_REQ));
+    body?.querySelectorAll(`td.nc-miss`).forEach(td => td.classList.remove("req-missing","nc-miss"));
+  }
+
+  function applyMarks(){
+    if (!isTarget()){
+      clearMyMarks();
+      return;
+    }
+
+    const sheet = getSheet();
+    if (!sheet) return;
+
+    const head = document.getElementById("gridHead");
+    const body = document.getElementById("gridBody");
+    if (!head || !body) return;
+
+    // resolve required col indexes by header name
+    const reqCols = [];
+    for (const h of REQUIRED_HEADERS){
+      const idx = findColIndexByHeader(sheet, h);
+      if (idx >= 0) reqCols.push(idx);
+    }
+    if (!reqCols.length) return;
+
+    // clear only ours first
+    head.querySelectorAll(`th.${TAG_REQ}`).forEach(el => el.classList.remove("req-col", TAG_REQ));
+    body.querySelectorAll(`td.${TAG_REQ}`).forEach(el => el.classList.remove("req-col", TAG_REQ));
+    body.querySelectorAll(`td.nc-miss`).forEach(td => td.classList.remove("req-missing","nc-miss"));
+
+    // header: th index offset +1 (corner cell)
+    const tr = head.querySelector("tr");
+    if (tr){
+      reqCols.forEach(c => {
+        const th = tr.children?.[c + 1];
+        if (th) th.classList.add("req-col", TAG_REQ);
+      });
+    }
+
+    // ALL rows: tint required columns
+    reqCols.forEach(c => {
+      body.querySelectorAll(`td[data-c="${c}"]`).forEach(td => {
+        td.classList.add("req-col", TAG_REQ);
+      });
+    });
+
+    // ONLY Row 1 (r===0): red outline if blank
+    const r = 0;
+    reqCols.forEach(c => {
+      const td = body.querySelector(`td[data-r="${r}"][data-c="${c}"]`);
+      if (!td) return;
+      const v = String(td.textContent || "").trim();
+      if (v === "") td.classList.add("req-missing","nc-miss");
+    });
+  }
+
+  function boot(){
+    try { applyMarks(); } catch {}
+  }
+
+  // live update
+  document.addEventListener("input", () => {
+    requestAnimationFrame(() => { try { applyMarks(); } catch {} });
+  }, true);
+
+  window.addEventListener("DOMContentLoaded", () => {
+    setTimeout(boot, 0);
+    setTimeout(boot, 200);
+  });
+
+  // keep after rerender/tab/mode changes
+  (function hook(name){
+    function tryHook(){
+      const fn = window[name];
+      if (typeof fn !== "function" || fn[`__ncReqHooked_${name}`]) return false;
+      window[name] = function(){
+        const ret = fn.apply(this, arguments);
+        try { applyMarks(); } catch {}
+        return ret;
+      };
+      window[name][`__ncReqHooked_${name}`] = true;
+      return true;
+    }
+    tryHook(); setTimeout(tryHook,0); setTimeout(tryHook,200); setTimeout(tryHook,800);
+  })("render");
+
+  ["refreshUI","setActive","switchMode"].forEach(n => {
+    (function hook2(name){
+      function tryHook(){
+        const fn = window[name];
+        if (typeof fn !== "function" || fn[`__ncReqHooked_${name}`]) return false;
+        window[name] = function(){
+          const ret = fn.apply(this, arguments);
+          try { applyMarks(); } catch {}
+          return ret;
+        };
+        window[name][`__ncReqHooked_${name}`] = true;
+        return true;
+      }
+      tryHook(); setTimeout(tryHook,0); setTimeout(tryHook,200); setTimeout(tryHook,800);
+    })(n);
+  });
+
+})();
+ /* ======================= END MODULE: 12J_NC_REQUIRED_ROW1_ONLY ======================= */
+
+
+
