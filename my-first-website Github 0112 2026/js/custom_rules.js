@@ -1434,83 +1434,16 @@ const CHECKS_BY_SHEET = {
 
   /* =========================================================
      ✅ Model > Normal Capacity (key: nc) CHECK
-     Rules:
-      - Check all required fields: Activity Code, Activity Name, Description
-      - Mark missing cells with error styling
-      - Show error count and first error location
+     Delegates to window.DEFS.CHECKS.normalCapacity
   ========================================================= */
-  nc: function checkNormalCapacitySheet(){
-    // ✅ 使用外部模組的檢查函數（如果已載入）
-    const checkFn = window.DEFS?.CHECKS?.normalCapacity;
-    if (typeof checkFn === "function") {
-      return checkFn();
+  nc: function checkNormalCapacityDelegate(){
+    const fn = window.DEFS?.CHECKS?.normalCapacity;
+    if (typeof fn !== "function") {
+      return { ok:false, type:"err", msg: (lang==="en"
+        ? "Normal Capacity rule not loaded: window.DEFS.CHECKS.normalCapacity"
+        : "Normal Capacity rule not loaded: window.DEFS.CHECKS.normalCapacity") };
     }
-
-    // ✅ Fallback：如果外部模組未載入，使用內建檢查
-    if (activeMode !== "model") {
-      return { ok:true, type:"warn", msg: (lang==="en" ? "Skipped (Period mode)." : "略過（Period 模式不檢查）。") };
-    }
-
-    const s = sheets?.nc;
-    if (!s) {
-      return {
-        ok:false, type:"err",
-        msg: (lang==="en" ? "Normal Capacity sheet not found." : "找不到 Normal Capacity 分頁。")
-      };
-    }
-
-    ensureSize(s);
-
-    // 找出必填欄位
-    const REQUIRED_HEADERS = ["Activity Code", "Activity Name", "Description"];
-    const requiredCols = [];
-    for (const h of REQUIRED_HEADERS){
-      const idx = _findColIndexByHeader("nc", h);
-      if (idx >= 0) requiredCols.push(idx);
-    }
-
-    if (requiredCols.length === 0) {
-      return {
-        ok:false, type:"err",
-        msg: (lang==="en" ? "Required headers not found." : "找不到必填欄位。")
-      };
-    }
-
-    // 檢查所有行
-    const rows = Number(s.rows || 0);
-    const errors = [];
-
-    for (let r = 0; r < rows; r++){
-      for (const c of requiredCols){
-        const v = String(s.data?.[r]?.[c] ?? "").trim();
-        if (v === ""){
-          errors.push({ row: r, col: c });
-          // 標記錯誤
-          const tbody = document.getElementById("gridBody");
-          const td = tbody?.querySelector(`td[data-r="${r}"][data-c="${c}"]`);
-          if (td) td.classList.add("req-missing");
-        }
-      }
-    }
-
-    if (errors.length === 0) {
-      return {
-        ok:true, type:"ok",
-        msg: (lang==="en" ? "✅ Check passed. All required fields are filled." : "✅ 檢查通過。所有必填欄位都已填寫。")
-      };
-    }
-
-    const firstError = errors[0];
-    const headerName = REQUIRED_HEADERS[requiredCols.indexOf(firstError.col)] || "Unknown";
-    
-    return {
-      ok:false, type:"err",
-      msg: (lang==="en"
-        ? `⚠️ Found ${errors.length} missing required field${errors.length > 1 ? "s" : ""}.\n\nFirst error: Row ${firstError.row + 1}, "${headerName}" is empty.`
-        : `⚠️ 發現 ${errors.length} 個必填欄位缺漏。\n\n第一個錯誤：第 ${firstError.row + 1} 列，「${headerName}」為空。`
-      ),
-      goto: { mode:"model", key:"nc", r:firstError.row, c:firstError.col }
-    };
+    return fn();
   },
 
   /* =========================================================
