@@ -19,108 +19,157 @@ window.DEFS.TOOLBAR_OPS = window.DEFS.TOOLBAR_OPS || {};
   // ======================= BLOCK: 01_INSTALL_GUARD_END =======================
 
 
-  // ======================= BLOCK: 02_HELPERS_START =======================
-function _roleIsAdminFallback(){
-  const role = String(sessionStorage.getItem("role") || "user").toLowerCase();
-  return role === "admin";
-}
+   // ======================= BLOCK: 02_HELPERS_START =======================
+  function _roleIsAdminFallback(){
+    const role = String(sessionStorage.getItem("role") || "user").toLowerCase();
+    return role === "admin";
+  }
 
-// ✅ 超強 fallback：不靠 CTX 也抓得到 def.cols
-function _getActiveMode(){
-  return (CTX && CTX.activeMode) ? CTX.activeMode : (window.activeMode || "model");
-}
-function _getActiveKey(){
-  return (CTX && CTX.activeKey) ? CTX.activeKey : (window.activeKey || "company");
-}
-function _getDefMapByMode(mode){
-  // 依序嘗試：CTX -> window 直掛 -> window.DEFS
-  if (mode === "period") {
+  function _getActiveMode(){
+    return (CTX && CTX.activeMode) ? CTX.activeMode : (window.activeMode || "model");
+  }
+  function _getActiveKey(){
+    return (CTX && CTX.activeKey) ? CTX.activeKey : (window.activeKey || "company");
+  }
+  function _getDefMapByMode(mode){
+    if (mode === "period") {
+      return (
+        (CTX && CTX.PERIOD_DEF_MAP) ||
+        window.PERIOD_DEF_MAP ||
+        window.DEFS?.PERIOD_DEF_MAP ||
+        {}
+      );
+    }
     return (
-      (CTX && CTX.PERIOD_DEF_MAP) ||
-      window.PERIOD_DEF_MAP ||
-      window.DEFS?.PERIOD_DEF_MAP ||
+      (CTX && CTX.MODEL_DEF_MAP) ||
+      window.MODEL_DEF_MAP ||
+      window.DEFS?.MODEL_DEF_MAP ||
       {}
     );
   }
-  return (
-    (CTX && CTX.MODEL_DEF_MAP) ||
-    window.MODEL_DEF_MAP ||
-    window.DEFS?.MODEL_DEF_MAP ||
-    {}
-  );
-}
 
-function _minColsForActiveSheet(){
-  const mode = _getActiveMode();
-  const key  = _getActiveKey();
-  const map  = _getDefMapByMode(mode);
-  const def  = map?.[key];
-  const v = Number(def?.cols);
-  return Number.isFinite(v) && v > 0 ? v : 1;
-}
-
-function _syncDelColBtnVisibility(){
-  const $ = (CTX && CTX.$) ? CTX.$ : ((id)=>document.getElementById(id));
-  const btn = $("delColBtn");
-  if (!btn) return;
-
-  const s = (CTX && typeof CTX.activeSheet === "function")
-    ? CTX.activeSheet()
-    : (typeof window.activeSheet === "function" ? window.activeSheet() : null);
-
-  if (!s) { btn.style.display = "none"; return; }
-
-  const minCols = _minColsForActiveSheet();
-  btn.style.display = (Number(s.cols || 0) > Number(minCols || 0)) ? "" : "none";
-}
-
-function _makeSafeSheetName(name, used) {
-  let base = String(name ?? "").trim() || "Sheet";
-  base = base.replace(/[\[\]\:\*\?\/\\]/g, " ").slice(0, 31);
-
-  let finalName = base, i = 2;
-  while (used.has(finalName)) {
-    const suffix = ` ${i}`;
-    finalName = base.slice(0, 31 - suffix.length) + suffix;
-    i++;
+  function _minColsForActiveSheet(){
+    const mode = _getActiveMode();
+    const key  = _getActiveKey();
+    const map  = _getDefMapByMode(mode);
+    const def  = map?.[key];
+    const v = Number(def?.cols);
+    return Number.isFinite(v) && v > 0 ? v : 1;
   }
-  used.add(finalName);
-  return finalName;
-}
 
-// ✅ XLSX: no row-number column
-function _sheetToAOA_NoRowNumber(s, sheetKey){
-  const { ensureSize, activeMode, ensureDafMeta } = CTX;
-  ensureSize(s);
+  // ✅ 保底：如果頁面沒有 delColBtn，就自動生一顆放在 addColBtn 旁邊
+  function _ensureDelColBtnExists(){
+    const $ = (CTX && CTX.$) ? CTX.$ : ((id)=>document.getElementById(id));
+    let btn = $("delColBtn");
+    if (btn) return btn;
 
-  if (activeMode === "period" && sheetKey === "daf") {
-    ensureDafMeta(s);
+    const addBtn = $("addColBtn");
+    if (!addBtn) return null;
 
-    const row1 = Array.from({ length: s.cols }, (_, c) => String(s.headers[c] ?? ""));
-    const row2 = Array.from({ length: s.cols }, (_, c) => (c < 3 ? "" : String(s.meta.dafDesc[c] ?? "")));
-    const row3 = Array.from({ length: s.cols }, (_, c) => (c < 3 ? "" : String(s.meta.dafEnt[c] ?? "")));
+    btn = document.createElement("button");
+    btn.id = "delColBtn";
+    btn.type = "button";
+    btn.textContent = "Delete Column";
+    btn.style.display = "none"; // 先隱藏，交給 sync 控制
+    btn.style.marginLeft = "6px";
 
-    const aoa = [row1, row2, row3];
+    // 放在 addColBtn 後面
+    addBtn.insertAdjacentElement("afterend", btn);
+
+    // 立刻把 click 綁到你原本的 on("delColBtn",...)（若 on 有事件代理會自動吃到）
+    return btn;
+  }
+
+  // ✅ 防止 toolbar 重畫把按鈕弄丟：觀察 DOM，丟了就補回來
+  function _startDelColBtnGuard(){
+    if (window.__DEL_COL_BTN_GUARD__) return;
+    window.__DEL_COL_BTN_GUARD__ = true;
+
+    const kick = () => {
+      try { _ensureDelColBtnExists(); } catch {}
+      try { _syncDelColBtnVisibility(); } catch {}
+    };
+
+    kick();
+
+    // observer
+    try{
+      const obs = new MutationObserver(() => kick());
+      obs.observe(document.documentElement, { childList:true, subtree:true });
+    } catch {}
+
+    // 短時間 interval 保險（避免 observer 沒抓到）
+    let n = 0;
+    const timer = setInterval(() => {
+      n++;
+      kick();
+      if (n >= 40) clearInterval(timer); // 約 4 秒
+    }, 100);
+  }
+
+  function _syncDelColBtnVisibility(){
+    const $ = (CTX && CTX.$) ? CTX.$ : ((id)=>document.getElementById(id));
+    const btn = $("delColBtn") || _ensureDelColBtnExists();
+    if (!btn) return;
+
+    const s = (CTX && typeof CTX.activeSheet === "function")
+      ? CTX.activeSheet()
+      : (typeof window.activeSheet === "function" ? window.activeSheet() : null);
+
+    if (!s) { btn.style.display = "none"; return; }
+
+    const minCols = _minColsForActiveSheet();
+    btn.style.display = (Number(s.cols || 0) > Number(minCols || 0)) ? "" : "none";
+  }
+
+  function _makeSafeSheetName(name, used) {
+    let base = String(name ?? "").trim() || "Sheet";
+    base = base.replace(/[\[\]\:\*\?\/\\]/g, " ").slice(0, 31);
+
+    let finalName = base, i = 2;
+    while (used.has(finalName)) {
+      const suffix = ` ${i}`;
+      finalName = base.slice(0, 31 - suffix.length) + suffix;
+      i++;
+    }
+    used.add(finalName);
+    return finalName;
+  }
+
+  function _sheetToAOA_NoRowNumber(s, sheetKey){
+    const { ensureSize, activeMode, ensureDafMeta } = CTX;
+    ensureSize(s);
+
+    if (activeMode === "period" && sheetKey === "daf") {
+      ensureDafMeta(s);
+
+      const row1 = Array.from({ length: s.cols }, (_, c) => String(s.headers[c] ?? ""));
+      const row2 = Array.from({ length: s.cols }, (_, c) => (c < 3 ? "" : String(s.meta.dafDesc[c] ?? "")));
+      const row3 = Array.from({ length: s.cols }, (_, c) => (c < 3 ? "" : String(s.meta.dafEnt[c] ?? "")));
+
+      const aoa = [row1, row2, row3];
+      for (let r = 0; r < s.rows; r++) {
+        aoa.push(Array.from({ length: s.cols }, (_, c) => (s.data[r][c] ?? "")));
+      }
+      return aoa;
+    }
+
+    const aoa = [];
+    aoa.push(Array.from({ length: s.cols }, (_, c) => (s.headers[c] ?? "")));
     for (let r = 0; r < s.rows; r++) {
       aoa.push(Array.from({ length: s.cols }, (_, c) => (s.data[r][c] ?? "")));
     }
     return aoa;
   }
+  // ======================= BLOCK: 02_HELPERS_END =======================
 
-  const aoa = [];
-  aoa.push(Array.from({ length: s.cols }, (_, c) => (s.headers[c] ?? "")));
-  for (let r = 0; r < s.rows; r++) {
-    aoa.push(Array.from({ length: s.cols }, (_, c) => (s.data[r][c] ?? "")));
-  }
-  return aoa;
-}
-// ======================= BLOCK: 02_HELPERS_END =======================
 
 
 
   // ======================= BLOCK: 03_BIND_TOOLBAR_EVENTS_START =======================
   function bindToolbarEvents(){
     if (!CTX) return;
+    _startDelColBtnGuard();
     if (bindToolbarEvents.__bound) return;
     bindToolbarEvents.__bound = true;
 
@@ -467,4 +516,5 @@ function _sheetToAOA_NoRowNumber(s, sheetKey){
   // ======================= BLOCK: 04_EXPORTS_END =======================
 
 })();
+
 
