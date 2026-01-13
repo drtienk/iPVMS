@@ -1,7 +1,5 @@
 login.html              ← 固定入口
-home.html               ← 固定入口
-login_v1_2.html          ← 真正登入頁 0108 2026
-index_v10_2.html         ← 真正主頁 0109 2026
+app.html         ← 真正主頁 0109 2026 (原本index_v10_2)
 
 
 PROJECT_STATUS.md（建議版本）
@@ -231,5 +229,6 @@ F5 後狀態跑掉 → app_init.js
 語言切換不一致 → i18n_role.js + lang_apply.js + tabs_ui.js
 
 Check 沒反應/顯示 no rules → custom_rules.js 的 CHECKS_BY_SHEET
+
 
 貼上/選取怪怪的 → selection_* + table_*
