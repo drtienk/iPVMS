@@ -98,6 +98,45 @@ console.log("✅ [19] app_init loaded");
         }
       }, 500); // 延遲 500ms 確保 DOM 完全準備好
 
+      // ====== 9) 全域捕捉任何點擊，定位真正的 Check 按鈕 ======
+      setTimeout(function setupGlobalClickCapture(){
+        document.addEventListener("click", function(e){
+          const t = e.target;
+          const txt = (t.innerText || t.textContent || "").trim();
+          if (txt.toLowerCase().includes("check")) {
+            alert("CLICK TARGET: " + (t.id || "(no id)") + " / " + t.tagName + " / " + txt);
+            
+            // ✅ 如果點到的是 Check 相關元素，也執行檢查
+            // 排除 checkStatusTitle（只是標題文字）
+            if (t.id !== "checkStatusTitle" && t.id !== "checkStatusMsg" && t.id !== "checkStatusClose") {
+              if (typeof window.runChecksForActiveSheet === "function") {
+                window.runChecksForActiveSheet();
+              }
+            }
+          }
+        }, true); // capture=true 捕捉階段
+        
+        console.log("✅ [app_init] Global click capture installed for 'Check' text");
+        
+        // ✅ 列出頁面上所有含有 "Check" 的元素
+        setTimeout(function listCheckElements(){
+          const allElements = document.querySelectorAll("*");
+          const checkElements = [];
+          allElements.forEach(el => {
+            const txt = (el.innerText || el.textContent || "").trim();
+            if (txt.toLowerCase().includes("check")) {
+              checkElements.push({
+                id: el.id || "(no id)",
+                tagName: el.tagName,
+                className: el.className || "(no class)",
+                text: txt.substring(0, 50) // 只取前50字
+              });
+            }
+          });
+          console.log("📋 [app_init] All elements containing 'Check':", checkElements);
+        }, 700);
+      }, 600); // 在綁定按鈕之後執行
+
     } catch (err) {
       window.showErr?.(err);
     }
