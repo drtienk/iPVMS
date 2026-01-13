@@ -1,4 +1,4 @@
-console.log("✅ [selection_events.js] loaded");
+console.log("✅ [selection_events.js] loaded (UNDO: cell-level + paste)");
 
 window.DEFS = window.DEFS || {};
 window.DEFS.SELECTION_EVENTS = window.DEFS.SELECTION_EVENTS || {};
@@ -110,61 +110,7 @@ window.DEFS.SELECTION_EVENTS = window.DEFS.SELECTION_EVENTS || {};
     }
 
     // =========================================================
-    //  Edit helpers
-    // =========================================================
-    function placeCaretAtEnd(td){
-      try{
-        const sel = window.getSelection?.();
-        if (!sel) return;
-        const range = document.createRange();
-        range.selectNodeContents(td);
-        range.collapse(false);
-        sel.removeAllRanges();
-        sel.addRange(range);
-      } catch {}
-    }
-
-    function enterEditOnTD(td, evt){
-      if (!td) return false;
-      if (typeof window.enterEditMode !== "function") return false;
-      window.enterEditMode(td, evt || {});
-      setTimeout(() => placeCaretAtEnd(td), 0);
-      setTimeout(() => placeCaretAtEnd(td), 50);
-      return true;
-    }
-
-    function exitEdit(){
-      if (typeof window.exitEditMode === "function") window.exitEditMode();
-    }
-
-    function moveSelectionDown(){
-      const s = API.Sel?.start;
-      if (!s) return;
-
-      const r = Number(s.r), c = Number(s.c);
-      if (!Number.isFinite(r) || !Number.isFinite(c)) return;
-
-      const tdNext = getTDByRC(r + 1, c);
-      if (!tdNext) return;
-
-      API.setSelection?.({ r: r + 1, c }, { r: r + 1, c });
-      safeApplySelectionDOM();
-      clearCaret();
-    }
-
-    function replaceCellWithChar(td, ch, evt){
-      enterEditOnTD(td, evt);
-      setTimeout(() => {
-        try{
-          td.textContent = ch;
-          placeCaretAtEnd(td);
-        } catch {}
-      }, 0);
-    }
-
-    // =========================================================
-    // ✅ TSV helpers for COPY/CUT (FIX: multi-cell copy guaranteed)
-    //    不用 API.selectionToTSV，直接依照 Sel.start/end 讀 DOM
+    //  TSV helpers
     // =========================================================
     function selectionRect(){
       const s = API.Sel?.start, e = API.Sel?.end;
@@ -198,26 +144,31 @@ window.DEFS.SELECTION_EVENTS = window.DEFS.SELECTION_EVENTS || {};
       return lines.join("\n");
     }
 
-    // =========================================================
-    //  TSV helpers (IMPORTANT: always use pasteTSVAt)
-    // =========================================================
+    function regionToTSV(top, left, rows, cols){
+      const lines = [];
+      for (let r = top; r < top + rows; r++){
+        const row = [];
+        for (let c = left; c < left + cols; c++){
+          const td = getTDByRC(r, c);
+          row.push(String(td?.textContent ?? "").replace(/\r?\n/g, " "));
+        }
+        lines.push(row.join("\t"));
+      }
+      return lines.join("\n");
+    }
+
     function normalizeClipboardText(s){
       return String(s ?? "").replace(/\r\n/g, "\n").replace(/\r/g, "\n");
     }
 
     function parseTSVToMatrix(text){
       const t = normalizeClipboardText(text);
-
-      if (!(t.includes("\t") || t.includes("\n"))){
-        return [[t]];
-      }
+      if (!(t.includes("\t") || t.includes("\n"))) return [[t]];
 
       let lines = t.split("\n");
       if (lines.length > 1 && lines[lines.length - 1] === "") lines.pop();
-
       const rows = lines.map(line => line.split("\t"));
-      if (!rows.length) return [[""]];
-      return rows;
+      return rows.length ? rows : [[""]];
     }
 
     function matrixToTSV(mat){
@@ -242,25 +193,189 @@ window.DEFS.SELECTION_EVENTS = window.DEFS.SELECTION_EVENTS || {};
       return out;
     }
 
-    function doPasteTextExcelStyle(text){
+    // =========================================================
+    //  ✅ Undo/Redo stack (CELL/RECT level)
+    // =========================================================
+    const HIST = { undo: [], redo: [], max: 200, busy:false };
+
+    function pushHist(step){
+      if (!step) return;
+      if (step.beforeTSV === step.afterTSV) return;
+      HIST.undo.push(step);
+      if (HIST.undo.length > HIST.max) HIST.undo.shift();
+      HIST.redo.length = 0;
+    }
+
+    function applyTSVAt(top, left, tsv){
+      // must use engine to update data model
+      if (typeof API.pasteTSVAt === "function"){
+        API.pasteTSVAt(top, left, tsv);
+      } else {
+        // fallback (should not happen)
+        const mat = parseTSVToMatrix(tsv);
+        for (let rr = 0; rr < mat.length; rr++){
+          for (let cc = 0; cc < (mat[rr]?.length || 0); cc++){
+            const td = getTDByRC(top + rr, left + cc);
+            if (td) td.textContent = String(mat[rr][cc] ?? "");
+          }
+        }
+      }
+    }
+
+    function doUndo(){
+      if (HIST.busy) return;
+      const step = HIST.undo.pop();
+      if (!step) return;
+      HIST.busy = true;
+
+      applyTSVAt(step.top, step.left, step.beforeTSV);
+
+      setTimeout(() => {
+        try{ if (typeof window.render === "function") window.render(); }catch{}
+        safeApplySelectionDOM();
+        clearCaret();
+        HIST.redo.push(step);
+        HIST.busy = false;
+      }, 0);
+    }
+
+    function doRedo(){
+      if (HIST.busy) return;
+      const step = HIST.redo.pop();
+      if (!step) return;
+      HIST.busy = true;
+
+      applyTSVAt(step.top, step.left, step.afterTSV);
+
+      setTimeout(() => {
+        try{ if (typeof window.render === "function") window.render(); }catch{}
+        safeApplySelectionDOM();
+        clearCaret();
+        HIST.undo.push(step);
+        HIST.busy = false;
+      }, 0);
+    }
+
+    // =========================================================
+    //  Edit helpers + cell-level commit
+    // =========================================================
+    function placeCaretAtEnd(td){
+      try{
+        const sel = window.getSelection?.();
+        if (!sel) return;
+        const range = document.createRange();
+        range.selectNodeContents(td);
+        range.collapse(false);
+        sel.removeAllRanges();
+        sel.addRange(range);
+      } catch {}
+    }
+
+    // one active edit session
+    const EDIT = { active:false, r:null, c:null, td:null, before:"" };
+
+    function beginEditSession(td){
+      try{
+        const r = Number(td?.dataset?.r);
+        const c = Number(td?.dataset?.c);
+        if (!Number.isFinite(r) || !Number.isFinite(c)) return false;
+
+        EDIT.active = true;
+        EDIT.r = r; EDIT.c = c; EDIT.td = td;
+        EDIT.before = String(td?.textContent ?? "");
+        return true;
+      }catch{
+        return false;
+      }
+    }
+
+    function commitEditSession(){
+      if (!EDIT.active) return;
+      try{
+        const after = String(EDIT.td?.textContent ?? "");
+        const before = String(EDIT.before ?? "");
+        if (before !== after){
+          pushHist({ top: EDIT.r, left: EDIT.c, rows: 1, cols: 1, beforeTSV: before, afterTSV: after });
+        }
+      }catch{}
+      EDIT.active = false;
+      EDIT.r = EDIT.c = null;
+      EDIT.td = null;
+      EDIT.before = "";
+    }
+
+    function enterEditOnTD(td, evt){
+      if (!td) return false;
+      if (typeof window.enterEditMode !== "function") return false;
+
+      // start session BEFORE entering edit mode
+      beginEditSession(td);
+
+      window.enterEditMode(td, evt || {});
+      setTimeout(() => placeCaretAtEnd(td), 0);
+      setTimeout(() => placeCaretAtEnd(td), 50);
+      return true;
+    }
+
+    function exitEdit(){
+      // commit BEFORE leaving edit mode
+      commitEditSession();
+      if (typeof window.exitEditMode === "function") window.exitEditMode();
+    }
+
+    function moveSelectionDown(){
+      const s = API.Sel?.start;
+      if (!s) return;
+
+      const r = Number(s.r), c = Number(s.c);
+      if (!Number.isFinite(r) || !Number.isFinite(c)) return;
+
+      const tdNext = getTDByRC(r + 1, c);
+      if (!tdNext) return;
+
+      API.setSelection?.({ r: r + 1, c }, { r: r + 1, c });
+      safeApplySelectionDOM();
+      clearCaret();
+    }
+
+    function replaceFirstCharAndStayEditing(td, ch, evt){
+      // Excel: start typing overwrites cell (one edit session)
+      enterEditOnTD(td, evt);
+      setTimeout(() => {
+        try{
+          td.textContent = String(ch ?? "");
+          placeCaretAtEnd(td);
+        } catch {}
+      }, 0);
+    }
+
+    // =========================================================
+    //  Paste (keep your original fill behavior) + record undo
+    // =========================================================
+    function doPasteTextExcelStyle_WithUndo(text){
       if (!API.hasSelection?.() || !API.Sel?.start) return;
 
       const rect = selectionRect();
       if (!rect) return;
 
-      const clipMat = parseTSVToMatrix(text);
+      const beforeTSV = regionToTSV(rect.top, rect.left, rect.rows, rect.cols);
 
+      const clipMat = parseTSVToMatrix(text);
       const isSingleSel = (rect.rows === 1 && rect.cols === 1);
 
       if (isSingleSel){
         const t = normalizeClipboardText(text);
-        API.pasteTSVAt?.(API.Sel.start.r, API.Sel.start.c, t);
-        return;
+        applyTSVAt(rect.top, rect.left, t);
+      } else {
+        const tiled = tileMatrixToSize(clipMat, rect.rows, rect.cols);
+        const outTSV = matrixToTSV(tiled);
+        applyTSVAt(rect.top, rect.left, outTSV);
       }
 
-      const tiled = tileMatrixToSize(clipMat, rect.rows, rect.cols);
-      const outTSV = matrixToTSV(tiled);
-      API.pasteTSVAt?.(rect.top, rect.left, outTSV);
+      setTimeout(() => {
+        const afterTSV = regionToTSV(rect.top, rect.left, rect.rows, rect.cols);
+        pushHist({ top: rect.top, left: rect.left, rows: rect.rows, cols: rect.cols, beforeTSV, afterTSV });
+      }, 0);
     }
 
     // =========================================================
@@ -285,7 +400,6 @@ window.DEFS.SELECTION_EVENTS = window.DEFS.SELECTION_EVENTS || {};
     // =========================================================
     //  Events
     // =========================================================
-
     document.addEventListener("mousedown", (e) => {
       const gridBody = getGridBody();
       if (!gridBody || !(e.target instanceof Node) || !gridBody.contains(e.target)) return;
@@ -337,7 +451,6 @@ window.DEFS.SELECTION_EVENTS = window.DEFS.SELECTION_EVENTS || {};
       const c = Number(td.dataset.c);
       if (!Number.isFinite(r) || !Number.isFinite(c)) return;
 
-      // ✅ FIX #1：拖曳時用 setSelection 同步 API selection（copy 才會是多格）
       const s = API.Sel?.start;
       if (s && Number.isFinite(Number(s.r)) && Number.isFinite(Number(s.c)) && typeof API.setSelection === "function"){
         API.setSelection({ r:Number(s.r), c:Number(s.c) }, { r, c });
@@ -378,7 +491,24 @@ window.DEFS.SELECTION_EVENTS = window.DEFS.SELECTION_EVENTS || {};
       const ae = document.activeElement;
       if (ae && (ae.tagName === "INPUT" || ae.tagName === "TEXTAREA")) return;
 
+      const kl = (e.key || "").toLowerCase();
+      const isMod = (e.ctrlKey || e.metaKey);
+
+      // ✅ Excel-like Undo/Redo: always cell-level (even in edit mode)
+      if (isMod && kl === "z"){
+        e.preventDefault();
+        if (e.shiftKey) doRedo();
+        else doUndo();
+        return;
+      }
+      if (isMod && kl === "y"){
+        e.preventDefault();
+        doRedo();
+        return;
+      }
+
       if (window.__CELL_EDIT_MODE){
+        // Commit on Enter (then move down)
         if (e.key === "Enter"){
           e.preventDefault();
           exitEdit();
@@ -394,16 +524,29 @@ window.DEFS.SELECTION_EVENTS = window.DEFS.SELECTION_EVENTS || {};
         return;
       }
 
-      const kl = (e.key || "").toLowerCase();
       if (kl === "delete" || kl === "backspace"){
         if (!API.hasSelection?.()) return;
+
+        const rect = selectionRect();
+        if (!rect) return;
+
+        const beforeTSV = regionToTSV(rect.top, rect.left, rect.rows, rect.cols);
+
         e.preventDefault();
         API.clearSelectedCells?.();
-        safeApplySelectionDOM();
-        clearCaret();
+
+        setTimeout(() => {
+          try{ if (typeof window.render === "function") window.render(); }catch{}
+          safeApplySelectionDOM();
+          clearCaret();
+
+          const afterTSV = regionToTSV(rect.top, rect.left, rect.rows, rect.cols);
+          pushHist({ top: rect.top, left: rect.left, rows: rect.rows, cols: rect.cols, beforeTSV, afterTSV });
+        }, 0);
         return;
       }
 
+      // Start typing: overwrite cell and stay editing; Undo will revert whole cell
       const k = e.key || "";
       const isPrintable = (k.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey);
       if (isPrintable){
@@ -418,17 +561,16 @@ window.DEFS.SELECTION_EVENTS = window.DEFS.SELECTION_EVENTS || {};
         if (!td) return;
 
         e.preventDefault();
-        replaceCellWithChar(td, k, e);
+        replaceFirstCharAndStayEditing(td, k, e);
         return;
       }
     }, true);
 
-    // ✅ Copy/Cut/Paste（大量 cell）
+    // ✅ Copy/Cut/Paste
     document.addEventListener("copy", (e) => {
       if (window.__CELL_EDIT_MODE) return;
       if (!API.hasSelection?.()) return;
 
-      // ✅ FIX #2：用 DOM 直接組 TSV，保證多格一定會複製到
       const tsv = selectionToTSV_ByDOM();
       if (!tsv) return;
 
@@ -440,17 +582,23 @@ window.DEFS.SELECTION_EVENTS = window.DEFS.SELECTION_EVENTS || {};
       if (window.__CELL_EDIT_MODE) return;
       if (!API.hasSelection?.()) return;
 
-      const tsv = selectionToTSV_ByDOM();
-      if (!tsv) return;
+      const rect = selectionRect();
+      if (!rect) return;
+
+      const beforeTSV = regionToTSV(rect.top, rect.left, rect.rows, rect.cols);
+      if (!beforeTSV) return;
 
       e.preventDefault();
-      e.clipboardData?.setData("text/plain", tsv);
+      e.clipboardData?.setData("text/plain", beforeTSV);
 
       setTimeout(() => {
         API.clearSelectedCells?.();
-        if (typeof window.render === "function") window.render();
+        try{ if (typeof window.render === "function") window.render(); }catch{}
         safeApplySelectionDOM();
         clearCaret();
+
+        const afterTSV = regionToTSV(rect.top, rect.left, rect.rows, rect.cols);
+        pushHist({ top: rect.top, left: rect.left, rows: rect.rows, cols: rect.cols, beforeTSV, afterTSV });
       }, 0);
     }, true);
 
@@ -461,10 +609,10 @@ window.DEFS.SELECTION_EVENTS = window.DEFS.SELECTION_EVENTS || {};
       e.preventDefault();
 
       const text = e.clipboardData?.getData("text") ?? "";
-      doPasteTextExcelStyle(text);
+      doPasteTextExcelStyle_WithUndo(text);
 
       setTimeout(() => {
-        if (typeof window.render === "function") window.render();
+        try{ if (typeof window.render === "function") window.render(); }catch{}
         safeApplySelectionDOM();
         clearCaret();
       }, 0);
