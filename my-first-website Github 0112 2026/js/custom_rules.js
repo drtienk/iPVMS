@@ -1293,9 +1293,27 @@ const CHECKS_BY_SHEET = {
 
 /* ✅ 主入口：只跑「目前分頁 activeKey」的規則 */
 function runChecksForActiveSheet(){
+  // ✅ 確保 CHECKS_BY_SHEET 已定義
+  if (typeof CHECKS_BY_SHEET === "undefined") {
+    console.error("CHECKS_BY_SHEET is not defined");
+    setCheckStatusForCurrentSheet(
+      "err",
+      "Check",
+      (lang==="en"
+        ? "Internal error: CHECKS_BY_SHEET not found."
+        : "內部錯誤：找不到 CHECKS_BY_SHEET。"
+      )
+    );
+    return;
+  }
+
   const fn = CHECKS_BY_SHEET[activeKey];
 
   if (typeof fn !== "function") {
+    // ✅ Debug: 列出所有已註冊的 keys
+    const registeredKeys = Object.keys(CHECKS_BY_SHEET).join(", ");
+    console.warn(`No check rule for activeKey="${activeKey}". Registered keys: ${registeredKeys}`);
+    
     setCheckStatusForCurrentSheet(
       "warn",
       "Check",
