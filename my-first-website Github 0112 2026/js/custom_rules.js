@@ -1369,7 +1369,43 @@ function runChecksForActiveSheet(){
   if (res.goto) gotoCell(res.goto);
 }
 
-on("checkBtn","click", runChecksForActiveSheet);
+// ✅ 延遲綁定 Check 按鈕，確保 CHECKS_BY_SHEET 已初始化
+(function bindCheckButton(){
+  function tryBind(){
+    // 確保 on 函數和 CHECKS_BY_SHEET 都已定義
+    const onFn = window.DEFS?.UTILS?.on || window.on;
+    if (typeof onFn !== "function") return false;
+    if (typeof CHECKS_BY_SHEET === "undefined") return false;
+    
+    // 確保 checkBtn 存在
+    const checkBtn = document.getElementById("checkBtn");
+    if (!checkBtn) return false;
+    
+    // 避免重複綁定
+    if (checkBtn.__checkBound) return true;
+    checkBtn.__checkBound = true;
+    
+    // 綁定 Check 按鈕
+    onFn("checkBtn", "click", runChecksForActiveSheet);
+    return true;
+  }
+  
+  // 立即嘗試
+  if (tryBind()) return;
+  
+  // 如果失敗，延遲重試
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", function(){
+      setTimeout(tryBind, 0);
+      setTimeout(tryBind, 100);
+      setTimeout(tryBind, 300);
+    });
+  } else {
+    setTimeout(tryBind, 0);
+    setTimeout(tryBind, 100);
+    setTimeout(tryBind, 300);
+  }
+})();
 
 /* =========================================================
    ✅ 切換分頁時自動「隱藏/顯示」
