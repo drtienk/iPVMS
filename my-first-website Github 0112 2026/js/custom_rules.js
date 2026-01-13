@@ -889,13 +889,43 @@ function applyCheckStatusVisibility(){
     return;
   }
 
+  // ✅ 顯示狀態框
   box.style.display = "block";
   tEl.textContent = item.title || "Check";
   mEl.textContent = item.msg || "";
 
+  // ✅ 根據類型設定顏色（綠色=成功，黃色=警告，紅色=錯誤）
   const type = item.type || "ok";
-  box.style.borderColor = (type==="ok") ? "#86efac" : (type==="warn") ? "#f59e0b" : "#ef4444";
-  box.style.background  = (type==="ok") ? "#f0fdf4" : (type==="warn") ? "#fffbeb" : "#fee2e2";
+  if (type === "ok") {
+    box.style.borderColor = "#86efac"; // 綠色邊框
+    box.style.background = "#f0fdf4";  // 淺綠色背景
+    box.style.color = "#166534";       // 深綠色文字
+  } else if (type === "warn") {
+    box.style.borderColor = "#f59e0b"; // 黃色邊框
+    box.style.background = "#fffbeb";  // 淺黃色背景
+    box.style.color = "#92400e";       // 深黃色文字
+  } else {
+    box.style.borderColor = "#ef4444"; // 紅色邊框
+    box.style.background = "#fee2e2";  // 淺紅色背景
+    box.style.color = "#991b1b";       // 深紅色文字
+  }
+  
+  // ✅ 確保結果區塊可見（強制顯示）
+  box.style.visibility = "visible";
+  box.style.opacity = "1";
+  
+  // ✅ 滾動到結果區塊（確保使用者能看到）
+  try {
+    box.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  } catch(e) {
+    // 如果 scrollIntoView 不支援，使用 scrollTop
+    try {
+      const rect = box.getBoundingClientRect();
+      if (rect.top < 0 || rect.bottom > window.innerHeight) {
+        window.scrollTo({ top: box.offsetTop - 20, behavior: "smooth" });
+      }
+    } catch(e2) {}
+  }
 }
 
 on("checkStatusClose","click", clearCheckStatusForCurrentSheet);
@@ -1544,14 +1574,9 @@ function runChecksForActiveSheet(){
 
   const res = fn();
 
-  // ✅ 臨時診斷：強制彈窗顯示結果（確認 rules 確實被執行）
-  if (res && typeof res === "object") {
-    alert(res.type + "\n" + res.msg);
-  } else {
-    alert("res is not an object: " + typeof res);
-  }
-
+  // ✅ 處理檢查結果並顯示 UI
   if (!res || res.ok) {
+    // 檢查通過：顯示綠色成功訊息
     setCheckStatusForCurrentSheet(
       res?.type || "ok",
       "Check",
@@ -1560,13 +1585,17 @@ function runChecksForActiveSheet(){
     return;
   }
 
+  // 檢查失敗：顯示紅色錯誤訊息
   setCheckStatusForCurrentSheet(
     res.type || "err",
     "Check",
     res.msg || (lang==="en" ? "⚠️ Check failed." : "⚠️ 檢查未通過。")
   );
 
-  if (res.goto) gotoCell(res.goto);
+  // 如果有指定跳轉位置，跳轉到第一個錯誤
+  if (res.goto && typeof gotoCell === "function") {
+    gotoCell(res.goto);
+  }
 }
 
 // ✅ 暴露到全域，確保 app_init.js 可以存取
