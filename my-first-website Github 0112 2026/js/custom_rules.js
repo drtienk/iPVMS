@@ -729,6 +729,11 @@ function _statusKey(mode, key){ return `${mode}|${key}`; }
 const CHECK_STATUS_STORE = {}; // { "model|company": {type,title,msg}, ... }
 
 function setCheckStatusForCurrentSheet(type, title, msg){
+  // ✅ DEBUG: 顯示 UI 渲染指示器
+  if (window.updateDebugIndicator) {
+    window.updateDebugIndicator("UI RENDER: " + type + " - " + (msg || "").substring(0, 25));
+  }
+  
   const k = _statusKey(activeMode, activeKey);
   CHECK_STATUS_STORE[k] = { type: type||"ok", title: title||"Check", msg: msg||"" };
   applyCheckStatusVisibility();
@@ -744,6 +749,13 @@ function applyCheckStatusVisibility(){
   let box = document.getElementById("checkStatus");
   let tEl = document.getElementById("checkStatusTitle");
   let mEl = document.getElementById("checkStatusMsg");
+  
+  // ✅ DEBUG: 檢查 DOM 節點狀態
+  if (window.updateDebugIndicator) {
+    const domStatus = "Box:" + (box ? "✓" : "✗") + " Title:" + (tEl ? "✓" : "✗") + " Msg:" + (mEl ? "✓" : "✗");
+    const current = document.getElementById("checkDebugIndicator")?.textContent || "";
+    window.updateDebugIndicator(current.replace("DEBUG: ", "") + " | DOM:" + domStatus);
+  }
   
   // ✅ 如果找不到元素，動態建立狀態框
   if (!box || !tEl || !mEl) {
@@ -1572,7 +1584,22 @@ function runChecksForActiveSheet(){
     return;
   }
 
+  // ✅ DEBUG: 顯示規則執行指示器
+  const ruleName = activeKey === "nc" ? "checkNormalCapacitySheet -> window.DEFS.CHECKS.normalCapacity" : fn.name || "unknown";
+  if (window.updateDebugIndicator) {
+    window.updateDebugIndicator("RULE RAN: " + ruleName);
+  }
+  
   const res = fn();
+  
+  // ✅ DEBUG: 顯示結果指示器
+  if (window.updateDebugIndicator) {
+    if (res && typeof res === "object") {
+      window.updateDebugIndicator("RESULT: " + (res.ok ? "ok" : "err") + "/" + (res.type || "?") + " - " + (res.msg || "").substring(0, 30));
+    } else {
+      window.updateDebugIndicator("RESULT: invalid (" + typeof res + ")");
+    }
+  }
 
   // ✅ 處理檢查結果並顯示 UI
   if (!res || res.ok) {
@@ -1601,6 +1628,45 @@ function runChecksForActiveSheet(){
 // ✅ 暴露到全域，確保 app_init.js 可以存取
 window.runChecksForActiveSheet = runChecksForActiveSheet;
 
+// ✅ DEBUG: 建立 Check 按鈕調試指示器（臨時）
+(function createCheckDebugIndicator(){
+  const indicator = document.createElement("div");
+  indicator.id = "checkDebugIndicator";
+  indicator.style.cssText = `
+    position: fixed;
+    top: 10px;
+    right: 10px;
+    background: #1f2937;
+    color: #fbbf24;
+    padding: 8px 12px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-family: monospace;
+    z-index: 99999;
+    max-width: 350px;
+    white-space: pre-wrap;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+    line-height: 1.4;
+  `;
+  indicator.textContent = "DEBUG: Ready";
+  
+  function insertIndicator(){
+    if (document.body) {
+      document.body.appendChild(indicator);
+    } else {
+      setTimeout(insertIndicator, 10);
+    }
+  }
+  insertIndicator();
+  
+  window.updateDebugIndicator = function(text){
+    const el = document.getElementById("checkDebugIndicator");
+    if (el) {
+      el.textContent = "DEBUG: " + text;
+    }
+  };
+})();
+
 // ✅ 延遲綁定 Check 按鈕，確保 CHECKS_BY_SHEET 已初始化
 (function bindCheckButton(){
   function tryBind(){
@@ -1620,6 +1686,10 @@ window.runChecksForActiveSheet = runChecksForActiveSheet;
     
     // ✅ 綁定 Check 按鈕：所有分頁統一使用 runChecksForActiveSheet() 標準流程
     onFn("checkBtn", "click", function(){
+      // ✅ DEBUG: 顯示點擊指示器
+      if (window.updateDebugIndicator) {
+        window.updateDebugIndicator("CLICKED");
+      }
       runChecksForActiveSheet();
     });
     return true;
