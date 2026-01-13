@@ -4,7 +4,20 @@ console.log("✅ [toolbar_ops.js] loaded");
 
 window.DEFS = window.DEFS || {};
 window.DEFS.TOOLBAR_OPS = window.DEFS.TOOLBAR_OPS || {};
+
+// ✅ GLOBAL shim: 任何人呼叫 _syncDelColBtnVisibility 都不會炸
+if (typeof window._syncDelColBtnVisibility !== "function") {
+  window._syncDelColBtnVisibility = function(){
+    try{
+      const btn = document.getElementById("delColBtn");
+      if (btn) btn.style.display = "";
+    } catch(_e){}
+  };
+}
+// ✅ legacy name (global identifier)
+var _syncDelColBtnVisibility = window._syncDelColBtnVisibility;
 // ======================= BLOCK: 00_FILE_HEADER END =======================
+
 
 (function installToolbarOps(){
   // ======================= BLOCK: 01_INSTALL_GUARD_START =======================
@@ -442,6 +455,7 @@ window.DEFS.TOOLBAR_OPS.syncDelColBtnVisibility = _syncDelColBtnVisibility;
 
 
 })();
+
 
 
 
