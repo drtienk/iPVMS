@@ -3,7 +3,8 @@
   FILE: js/rules_normal_capacity.js
   AREA: Model > Normal Capacity (key: nc) validation rules
   GOAL:
-    - Check only Row 1 (row index 0): Activity Code, Activity Name, Description
+    - Check only Row 1 (row index 0): Activity Code and Activity Name (must be paired)
+    - Description is optional (Rule 3: no error if empty)
     - Mark missing cells with error styling (req-missing)
     - Show check result message (pass / error count)
     - Set checked status in sessionStorage when check passes
@@ -18,11 +19,10 @@ console.log("✅ [rules_normal_capacity.js] loaded");
   const TARGET_KEY  = "nc";
   const CHECKED_STATUS_KEY = "nc_checked_status"; // sessionStorage key
 
-  // ✅ 必填欄位清單（與 required fields UI 使用同一份 source of truth）
+  // ✅ 必填欄位清單（只檢查 Activity Code 和 Activity Name，Description 是選填）
   const REQUIRED_HEADERS = [
     "Activity Code",
-    "Activity Name",
-    "Description"
+    "Activity Name"
   ];
 
   // ✅ 文字正規化（與 required fields UI 一致）
@@ -155,21 +155,16 @@ console.log("✅ [rules_normal_capacity.js] loaded");
     }
 
     // 找出必填欄位的 index
-    const requiredCols = [];
-    for (const headerName of REQUIRED_HEADERS){
-      const colIdx = findColIndexByHeader(sheet, headerName);
-      if (colIdx >= 0) {
-        requiredCols.push(colIdx);
-      }
-    }
+    const colActivityCode = findColIndexByHeader(sheet, "Activity Code");
+    const colActivityName = findColIndexByHeader(sheet, "Activity Name");
 
-    if (requiredCols.length === 0) {
+    if (colActivityCode < 0 || colActivityName < 0) {
       return {
         ok: false,
         type: "err",
         msg: (typeof lang !== "undefined" && lang === "en")
-          ? "Required headers not found in sheet."
-          : "分頁中找不到必填欄位。"
+          ? "Required headers not found in sheet (Activity Code or Activity Name missing)."
+          : "分頁中找不到必填欄位（缺少 Activity Code 或 Activity Name）。"
       };
     }
 
@@ -180,14 +175,60 @@ console.log("✅ [rules_normal_capacity.js] loaded");
     const rowToCheck = 0;
     const errors = [];
 
-    for (const c of requiredCols){
-      const value = sheet.data?.[rowToCheck]?.[c];
-      if (isEmpty(value)){
-        const headerName = REQUIRED_HEADERS[requiredCols.indexOf(c)];
-        errors.push({ row: rowToCheck, col: c, header: headerName });
-        markErrorCell(rowToCheck, c);
-      }
+    // 取得第 1 列的值
+    const valueCode = sheet.data?.[rowToCheck]?.[colActivityCode];
+    const valueName = sheet.data?.[rowToCheck]?.[colActivityName];
+    
+    const isEmptyCode = isEmpty(valueCode);
+    const isEmptyName = isEmpty(valueName);
+
+    // ✅ 規則 1 & 2：Activity Code 和 Activity Name 必須成對
+    // - 如果兩個都空白：兩個都報錯
+    // - 如果只有一個有值：另一個也要報錯（成對規則）
+    if (isEmptyCode && isEmptyName) {
+      // 兩個都空白
+      errors.push({ 
+        row: rowToCheck, 
+        col: colActivityCode, 
+        header: "Activity Code",
+        msg: (typeof lang !== "undefined" && lang === "en")
+          ? "Activity Code is required in Row 1."
+          : "第 1 列必須填寫 Activity Code。"
+      });
+      errors.push({ 
+        row: rowToCheck, 
+        col: colActivityName, 
+        header: "Activity Name",
+        msg: (typeof lang !== "undefined" && lang === "en")
+          ? "Activity Name is required in Row 1."
+          : "第 1 列必須填寫 Activity Name。"
+      });
+      markErrorCell(rowToCheck, colActivityCode);
+      markErrorCell(rowToCheck, colActivityName);
+    } else if (isEmptyCode && !isEmptyName) {
+      // Activity Code 空白，但 Activity Name 有值 → Activity Code 必須填寫
+      errors.push({ 
+        row: rowToCheck, 
+        col: colActivityCode, 
+        header: "Activity Code",
+        msg: (typeof lang !== "undefined" && lang === "en")
+          ? "Activity Code is required when Activity Name has a value (Rule 2: must be paired)."
+          : "當 Activity Name 有值時，Activity Code 也必須填寫（規則 2：必須成對）。"
+      });
+      markErrorCell(rowToCheck, colActivityCode);
+    } else if (!isEmptyCode && isEmptyName) {
+      // Activity Name 空白，但 Activity Code 有值 → Activity Name 必須填寫
+      errors.push({ 
+        row: rowToCheck, 
+        col: colActivityName, 
+        header: "Activity Name",
+        msg: (typeof lang !== "undefined" && lang === "en")
+          ? "Activity Name is required when Activity Code has a value (Rule 2: must be paired)."
+          : "當 Activity Code 有值時，Activity Name 也必須填寫（規則 2：必須成對）。"
+      });
+      markErrorCell(rowToCheck, colActivityName);
     }
+    // ✅ 規則 3：Description 是選填的，不檢查（如果兩個都有值，就通過）
 
     // 產生結果訊息
     if (errors.length === 0) {
@@ -198,20 +239,19 @@ console.log("✅ [rules_normal_capacity.js] loaded");
         ok: true,
         type: "ok",
         msg: (typeof lang !== "undefined" && lang === "en")
-          ? "✅ Check passed. Row 1 required fields are filled."
-          : "✅ 檢查通過。第 1 列必填欄位都已填寫。"
+          ? "✅ Check passed. Row 1: Activity Code and Activity Name are both filled."
+          : "✅ 檢查通過。第 1 列：Activity Code 和 Activity Name 都已填寫。"
       };
     }
 
     // 有錯誤：清除已檢查狀態並顯示錯誤
     setCheckedStatus(false);
     
-    const errorCount = errors.length;
-    const missingHeaders = errors.map(e => e.header).join("、");
-    
+    // 產生錯誤訊息
+    const errorLines = errors.map(e => e.msg || `${e.header}: ${(typeof lang !== "undefined" && lang === "en") ? "missing" : "缺漏"}`);
     const errorMsg = (typeof lang !== "undefined" && lang === "en")
-      ? `⚠️ Found ${errorCount} missing required field${errorCount > 1 ? "s" : ""} in Row 1:\n${missingHeaders}`
-      : `⚠️ 第 1 列發現 ${errorCount} 個必填欄位缺漏：\n${missingHeaders}`;
+      ? `⚠️ Found ${errors.length} error(s) in Row 1:\n${errorLines.join("\n")}`
+      : `⚠️ 第 1 列發現 ${errors.length} 個錯誤：\n${errorLines.join("\n")}`;
 
     return {
       ok: false,
