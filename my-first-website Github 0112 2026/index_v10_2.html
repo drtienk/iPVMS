@@ -1,0 +1,531 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+
+<!-- ======================================
+BLOCK: 10_HEAD_META
+AREA: HEAD / meta / title / external libs
+SAFE TO REPLACE WHOLE BLOCK
+====================================== -->
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Model Excel（v10.3 slim）</title>
+
+  <!-- SheetJS（匯出 XLSX 用） -->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+
+  <!-- ======================================
+  BLOCK: 11_HEAD_STYLE_ALL
+  AREA: CSS (all styles)
+  SAFE TO REPLACE WHOLE BLOCK
+  ====================================== -->
+  <style>
+    :root{
+      --maxw: 100%;
+      --bd:#cbd5e1;
+      --bg:#f8fafc;
+      --muted:#6b7280;
+      --primary:#3498db;
+      --dark:#111827;
+      --danger:#ef4444;
+      --ok:#10b981;
+      --violet:#7c3aed;
+      --page-pad: 16px;
+    }
+
+    body { font-family: system-ui, "Noto Sans TC", sans-serif; padding: var(--page-pad); margin:0; }
+    h2 { margin: 8px 0 12px; }
+    button { padding: 10px 14px; border: 0; border-radius: 10px; background: var(--primary); color: #fff; cursor: pointer; }
+    button:active { transform: translateY(1px); }
+
+    .topbar { display:flex; justify-content:space-between; align-items:center; max-width:var(--maxw); width: 100%; gap:12px; flex-wrap:wrap; }
+    .topbar-left { display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
+    .mode-wrap { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+    .pill { font-size:13px; padding:4px 10px; border:1px solid #e5e7eb; border-radius:999px; background:#fff; color:#111827; }
+    .topbar-right { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+
+    select.select-pill{ padding:6px 10px; border:1px solid var(--bd); border-radius:999px; background:#fff; font-weight:700; }
+
+    .mode-btn { background:#e5e7eb; color:#111; border:1px solid #cbd5e1; border-radius:999px; padding:6px 12px; font-weight:700; }
+    .mode-btn.active { background:var(--dark); color:#fff; border-color:var(--dark); }
+
+    .tab-bar{ display:flex; flex-direction:column; gap:10px; margin: 8px 0 12px; max-width:var(--maxw); width:100%; }
+    .tab-group{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+    .tab-group-title{
+      font-weight:800; color:#111827; background:#f3f4f6; border:1px solid #e5e7eb;
+      padding:6px 12px; border-radius:999px; white-space:nowrap;
+    }
+    .tab-group-buttons{ display:flex; gap:8px; flex-wrap:wrap; }
+    .tab-btn { background:#e5e7eb; color:#111; border:1px solid #cbd5e1; border-radius:999px; padding:6px 10px; }
+    .tab-btn.active { background:var(--primary); color:#fff; border-color:var(--primary); }
+
+    .toolbar { display:flex; gap:8px; flex-wrap:wrap; margin: 10px 0 10px; max-width:var(--maxw); width:100%; }
+
+    .grid-wrap { max-width: var(--maxw); width: 100%; overflow:auto; border: 1px solid var(--bd); border-radius: 10px; }
+
+    table { border-collapse: collapse; width: max-content; min-width: 100%; }
+    th, td { border:1px solid var(--bd); padding: 8px; }
+    th { background:#f3f4f6; font-weight:600; }
+
+    td { min-width: 140px; }
+    td:focus { outline: 2px solid #60a5fa; outline-offset: -2px; }
+
+    td.cell-selected{ background: rgba(96,165,250,0.25); }
+    td.cell-anchor{ outline: 2px solid rgba(37,99,235,0.9); outline-offset: -2px; }
+
+    #jsError { display:none; margin:12px 0; padding:10px; border:1px solid var(--danger); background:#fee2e2; color:#7f1d1d; white-space:pre-wrap; border-radius:10px; }
+    .hint { font-size:14px; color:#555; max-width: var(--maxw); width:100%; }
+
+    .th-input{
+      width:100%; box-sizing:border-box; border:0; outline:none; background:transparent;
+      font-weight:600; font-size:14px; text-align:center;
+    }
+
+    .panel{
+      margin:8px 0 16px; padding:12px; border:1px solid var(--bd); border-radius:10px;
+      max-width:var(--maxw); width:100%;
+      background:var(--bg);
+    }
+    .panel label{ font-weight:600; margin-right:8px; }
+    .panel input{ padding:6px 8px; border:1px solid var(--bd); border-radius:6px; min-width:240px; }
+    .panel-note{ margin-left:12px; color:#555; font-size:14px; }
+
+    #periodBar{
+      display:none; max-width:var(--maxw); width:100%;
+      margin: 8px 0 14px; padding: 10px 12px;
+      border:1px solid var(--bd); border-radius:10px; background:var(--bg);
+      gap:10px; align-items:center; flex-wrap:wrap;
+    }
+    #periodBar select{ padding:6px 8px; border:1px solid var(--bd); border-radius:8px; background:#fff; }
+
+    .btn-dark{ background:var(--dark) !important; }
+    .btn-danger{ background:var(--danger) !important; }
+    .btn-ok{ background:var(--ok) !important; }
+    .btn-gray{ background:var(--muted) !important; }
+    .btn-violet{ background:var(--violet) !important; }
+
+    .modal{ display:none; position:fixed; inset:0; background:rgba(0,0,0,.4); z-index:9999; }
+    .modal.high{ z-index:99999; background:rgba(0,0,0,.45); }
+    .modal-card{
+      background:#fff; width:min(920px, calc(100% - 24px)); margin:40px auto;
+      border-radius:14px; overflow:hidden; box-shadow:0 12px 30px rgba(0,0,0,.25);
+    }
+    .modal-card.narrow{ width:min(520px, calc(100% - 24px)); margin:90px auto; }
+    .modal-card.mid{ width:min(760px, calc(100% - 24px)); margin:60px auto; }
+
+    .modal-head{
+      padding:14px 16px; background:var(--dark); color:#fff;
+      display:flex; justify-content:space-between; align-items:center;
+    }
+    .modal-body{ padding:16px; }
+    .modal-foot{
+      padding:12px 16px; border-top:1px solid #e5e7eb;
+      display:flex; gap:8px; justify-content:flex-end; flex-wrap:wrap;
+    }
+
+    .admin-cols{ padding:14px 16px; display:flex; gap:16px; flex-wrap:wrap; }
+    .admin-col{ flex:1; min-width:320px; }
+    .admin-list{ border:1px solid #e5e7eb; border-radius:10px; padding:10px; max-height:360px; overflow:auto; }
+
+    .period-row{ display:flex; gap:12px; margin-top:14px; flex-wrap:wrap; }
+    .period-col{ flex:1; min-width:180px; }
+    .period-col select{ width:100%; padding:8px 10px; border:1px solid var(--bd); border-radius:10px; }
+
+    .desc{ font-size:14px; color:#374151; line-height:1.7; }
+    .table-box{ border:1px solid #e5e7eb; border-radius:12px; overflow:auto; }
+    .table-mini{ border-collapse:collapse; width:100%; min-width:640px; }
+    .table-mini th{ border-bottom:1px solid #e5e7eb; padding:10px; background:#f9fafb; text-align:left; }
+    .table-mini th.last{ text-align:left; width:90px; }
+
+    /* =========================================================
+       ✅ REQUIRED FIELDS UI (NO asterisk / NO extra text)
+       - header: subtle tint + inset border
+       - cells: subtle tint
+       - missing: red outline
+    ========================================================= */
+    th.req-col{
+      box-shadow: inset 0 0 0 2px rgba(245, 158, 11, 0.45);
+      background: rgba(245, 158, 11, 0.08);
+    }
+    td.req-col{
+      background: rgba(245, 158, 11, 0.08);
+    }
+    td.req-missing{
+      outline: 2px solid rgba(239, 68, 68, 0.95);
+      outline-offset: -2px;
+      background: rgba(239, 68, 68, 0.06);
+    }
+    td.cell-selected.req-col{ background: rgba(96,165,250,0.25); }
+  </style>
+  <!-- ========= END BLOCK: 11_HEAD_STYLE_ALL ========= -->
+
+</head>
+<!-- ========= END BLOCK: 10_HEAD_META ========= -->
+
+<body>
+
+  <!-- ======================================
+  BLOCK: 20_UI_TOPBAR
+  AREA: BODY / topbar / mode buttons / language / admin/logout
+  SAFE TO REPLACE WHOLE BLOCK
+  ====================================== -->
+  <div class="topbar">
+    <div class="topbar-left">
+      <h2 id="pageTitle">📋 Model Excel</h2>
+
+      <div class="mode-wrap">
+        <button id="btnModeModel" type="button" class="mode-btn active">Model</button>
+        <button id="btnModePeriod" type="button" class="mode-btn">Period</button>
+
+        <span id="currentPeriodTag" class="pill" style="display:none;">Period：—</span>
+      </div>
+    </div>
+
+    <div class="topbar-right">
+
+      <!-- ======================================
+      BLOCK: 20A_UI_ACTIONS_DROPDOWN
+      AREA: TOPBAR / Actions select menu
+      SAFE TO REPLACE WHOLE BLOCK
+      ====================================== -->
+      <select id="actionMenu" class="select-pill">
+        <option value="">Actions</option>
+        <option value="export_csv">Export CSV (current sheet)</option>
+        <option value="export_xlsx">Export XLSX (all sheets in one file)</option>
+
+        <!-- ✅ ADMIN ONLY -->
+        <option value="export_json" data-admin-only="1">Export JSON (workspace snapshot)</option>
+        <option value="import_json" data-admin-only="1">Import JSON (load workspace snapshot)</option>
+
+        <option value="clear_local">Clear Local Cache (current mode)</option>
+        <option value="delete_col">Delete Column</option>
+      </select>
+      <!-- ========= END BLOCK: 20A_UI_ACTIONS_DROPDOWN ========= -->
+
+      <select id="langSelect" class="select-pill">
+        <option value="en">English</option>
+        <option value="zh">中文</option>
+      </select>
+
+      <button type="button" id="sheetAdminBtn" class="btn-dark" style="display:none;">分頁管理</button>
+      <button type="button" id="userAdminBtn" class="btn-violet" style="display:none;">User 管理</button>
+      <button type="button" id="logoutBtn" class="btn-danger">登出</button>
+    </div>
+  </div>
+  <!-- ========= END BLOCK: 20_UI_TOPBAR ========= -->
+
+
+  <!-- ======================================
+  BLOCK: 21_UI_COMPANY_META
+  AREA: BODY / company panel
+  SAFE TO REPLACE WHOLE BLOCK
+  ====================================== -->
+  <div id="companyMeta" class="panel">
+    <label id="companyLabel">公司名稱：</label>
+    <input id="companyNameInput" type="text" value="" readonly />
+    <span id="companyNote" class="panel-note">（此文件所屬公司）</span>
+  </div>
+  <!-- ========= END BLOCK: 21_UI_COMPANY_META ========= -->
+
+
+  <!-- ======================================
+  BLOCK: 22_UI_PERIOD_BAR
+  AREA: BODY / period bar
+  SAFE TO REPLACE WHOLE BLOCK
+  ====================================== -->
+  <div id="periodBar">
+    <div id="periodBarTitle" style="font-weight:800; color:#111827;">📅 Period 工作區</div>
+    <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+      <span id="periodBarCurrent" style="font-size:14px; color:#374151;">目前：</span>
+      <select id="periodSelect"></select>
+      <button id="newPeriodBtn" type="button" class="btn-ok">新增 Period（yyyy-mm）</button>
+      <span id="periodBarHelp" style="font-size:12px; color:#6b7280;">（每個 Period 都會自動有一套分頁，資料分開儲存）</span>
+    </div>
+  </div>
+  <!-- ========= END BLOCK: 22_UI_PERIOD_BAR ========= -->
+
+
+  <!-- ======================================
+  BLOCK: 23_UI_TABBAR
+  AREA: BODY / tab bar container
+  SAFE TO REPLACE WHOLE BLOCK
+  ====================================== -->
+  <div class="tab-bar" id="tabBar"></div>
+  <!-- ========= END BLOCK: 23_UI_TABBAR ========= -->
+
+
+  <!-- ======================================
+  BLOCK: 24_UI_ERROR_BOX
+  AREA: BODY / error area + check status
+  SAFE TO REPLACE WHOLE BLOCK
+  ====================================== -->
+  <div id="jsError"></div>
+
+  <div id="checkStatus" class="panel" style="display:none; margin-top:10px;">
+    <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:10px;">
+      <div>
+        <div id="checkStatusTitle" style="font-weight:800; margin-bottom:6px;">Check</div>
+        <div id="checkStatusMsg" style="white-space:pre-wrap; line-height:1.7;"></div>
+      </div>
+      <button type="button" id="checkStatusClose" class="btn-gray" style="padding:6px 10px;">關閉</button>
+    </div>
+  </div>
+  <!-- ========= END BLOCK: 24_UI_ERROR_BOX ========= -->
+
+
+  <!-- ======================================
+  BLOCK: 25_UI_TOOLBAR
+  AREA: BODY / toolbar buttons
+  SAFE TO REPLACE WHOLE BLOCK
+  ====================================== -->
+  <div class="toolbar">
+    <button id="addRowBtn" type="button">新增一列</button>
+    <button id="addColBtn" type="button">新增一欄</button>
+    <button id="delColBtn" type="button" class="btn-danger" style="display:none;">刪除一欄</button>
+
+    <button id="checkBtn" type="button" class="btn-violet">Check</button>
+
+    <button id="exportCsvBtn" type="button">匯出 CSV（目前分頁）</button>
+    <button id="exportXlsxBtn" type="button">匯出 XLSX（全部分頁同檔）</button>
+
+    <!-- ✅ ADMIN ONLY (buttons) -->
+    <button id="exportJsonBtn" type="button" data-admin-only="1">匯出 JSON（全部分頁暫存檔）</button>
+    <button id="importJsonBtn" type="button" data-admin-only="1">匯入 JSON（載入協作暫存檔）</button>
+    <input id="importJsonFile" type="file" accept="application/json" style="display:none;" data-admin-only="1" />
+
+    <button id="clearLocalBtn" type="button" class="btn-gray">清除本機暫存（目前模式）</button>
+  </div>
+  <!-- ========= END BLOCK: 25_UI_TOOLBAR ========= -->
+
+
+  <!-- ======================================
+  BLOCK: 26_UI_GRID
+  AREA: BODY / main table grid
+  SAFE TO REPLACE WHOLE BLOCK
+  ====================================== -->
+  <div class="grid-wrap">
+    <table>
+      <thead id="gridHead"></thead>
+      <tbody id="gridBody"></tbody>
+    </table>
+  </div>
+
+  <p class="hint" id="hintText"></p>
+  <!-- ========= END BLOCK: 26_UI_GRID ========= -->
+
+
+  <!-- ======================================
+  BLOCK: 27_UI_MODAL_SHEET_ADMIN
+  AREA: BODY / sheet admin modal
+  SAFE TO REPLACE WHOLE BLOCK
+  ====================================== -->
+  <div id="sheetAdminModal" class="modal">
+    <div class="modal-card">
+      <div class="modal-head">
+        <div id="adminTitle" style="font-weight:800;">🔧 分頁顯示/隱藏（只影響目前公司）</div>
+        <button type="button" id="sheetAdminClose" class="btn-gray">關閉</button>
+      </div>
+
+      <div class="admin-cols">
+        <div class="admin-col">
+          <div id="adminModelTitle" style="font-weight:800; margin-bottom:8px;">Model 分頁</div>
+          <div id="sheetAdminListModel" class="admin-list"></div>
+        </div>
+
+        <div class="admin-col">
+          <div id="adminPeriodTitle" style="font-weight:800; margin-bottom:8px;">Period 分頁</div>
+          <div id="sheetAdminListPeriod" class="admin-list"></div>
+        </div>
+      </div>
+
+      <div class="modal-foot">
+        <button type="button" id="sheetAdminAllOn" class="btn-ok">全部顯示</button>
+        <button type="button" id="sheetAdminAllOff" class="btn-gray">全部隱藏</button>
+        <button type="button" id="sheetAdminSave">儲存並套用</button>
+      </div>
+    </div>
+  </div>
+  <!-- ========= END BLOCK: 27_UI_MODAL_SHEET_ADMIN ========= -->
+
+
+  <!-- ======================================
+  BLOCK: 28_UI_MODAL_PERIOD_PICKER
+  AREA: BODY / period picker modal
+  SAFE TO REPLACE WHOLE BLOCK
+  ====================================== -->
+  <div id="periodModal" class="modal high">
+    <div class="modal-card narrow">
+      <div class="modal-head">
+        <div id="periodModalTitle" style="font-weight:800;">📅 建立 / 選擇 Period（yyyy-mm）</div>
+        <button type="button" id="periodModalClose" class="btn-gray">關閉</button>
+      </div>
+
+      <div class="modal-body">
+        <div id="periodModalDesc" class="desc"></div>
+
+        <div class="period-row">
+          <div class="period-col">
+            <div style="font-weight:800; margin-bottom:6px;">Year</div>
+            <select id="periodYear"></select>
+          </div>
+          <div class="period-col">
+            <div style="font-weight:800; margin-bottom:6px;">Month</div>
+            <select id="periodMonth"></select>
+          </div>
+        </div>
+
+        <div style="display:flex; gap:8px; justify-content:flex-end; margin-top:16px; flex-wrap:wrap;">
+          <button type="button" id="periodCreateBtn" class="btn-ok">建立並切換</button>
+          <button type="button" id="periodCancelBtn" class="btn-gray">取消</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  <!-- ========= END BLOCK: 28_UI_MODAL_PERIOD_PICKER ========= -->
+
+
+  <!-- ======================================
+  BLOCK: 29_UI_MODAL_USER_ADMIN
+  AREA: BODY / user admin modal
+  SAFE TO REPLACE WHOLE BLOCK
+  ====================================== -->
+  <div id="userAdminModal" class="modal high">
+    <div class="modal-card mid">
+      <div class="modal-head">
+        <div style="font-weight:800;">👤 User → Company 管理（僅 Admin）</div>
+        <button type="button" id="userAdminClose" class="btn-gray">關閉</button>
+      </div>
+
+      <div class="modal-body">
+        <div class="desc" style="margin-bottom:10px;">
+          在這裡設定每個 user 登入後要進入哪一間公司。<br>
+          這些設定會儲存在本機瀏覽器（localStorage）。
+        </div>
+
+        <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-bottom:10px;">
+          <button type="button" id="userAdminAddRow" class="btn-ok">新增一個 user</button>
+          <button type="button" id="userAdminReset" class="btn-gray">重置為預設</button>
+        </div>
+
+        <div class="table-box">
+          <table class="table-mini">
+            <thead>
+              <tr>
+                <th>Username</th>
+                <th>Company ID</th>
+                <th>Company Name</th>
+                <th class="last"></th>
+              </tr>
+            </thead>
+            <tbody id="userAdminTbody"></tbody>
+          </table>
+        </div>
+
+        <div style="display:flex; gap:8px; justify-content:flex-end; margin-top:12px; flex-wrap:wrap;">
+          <button type="button" id="userAdminSave">儲存</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  <!-- ========= END BLOCK: 29_UI_MODAL_USER_ADMIN ========= -->
+
+<!-- ======================================
+  BLOCK: 90_SCRIPTS_ALL
+  AREA: BODY END / all scripts
+  SAFE TO REPLACE WHOLE BLOCK
+  ====================================== -->
+<script src="js/defs.js"></script>
+<script src="js/sheets_def_registry.js"></script>
+<script src="js/tabs_def.js"></script>
+<script src="js/i18n_def.js"></script>
+
+<script src="js/i18n_role.js"></script>
+
+<script src="js/lang_ui.js"></script>
+<script src="js/tabs_ui.js"></script>
+
+<script src="js/utils.js"></script>
+<script src="js/utils_globals.js"></script>
+
+<script src="js/visibility_store.js"></script>
+<script src="js/period_store.js"></script>
+<script src="js/user_directory_store.js"></script>
+
+<script src="js/mode_storage_store.js"></script>
+<script src="js/sheets_core_store.js"></script>
+
+<!-- ✅ core app states (do not run init here) -->
+<script src="js/app_state_login.js"></script>
+<script src="js/app_sheets_core.js"></script>
+<script src="js/app_mode_storage.js"></script>
+
+<script src="js/table_core.js"></script>
+<script src="js/selection_core.js"></script>
+<script src="js/selection_events.js"></script>
+
+<script src="js/table_core_bootstrap.js"></script>
+<script src="js/table_render_core.js"></script>
+
+<script src="js/toolbar_ops.js"></script>
+<script src="js/sheet_admin_ui.js"></script>
+<script src="js/period_ui.js"></script>
+
+<!-- router/app core -->
+<script src="js/mode_router.js"></script>
+<script src="js/app.js"></script>
+
+<!-- wrappers / delegates -->
+<script src="js/lang_apply.js"></script>
+<script src="js/tabs_ui_wrappers.js"></script>
+<script src="js/router_wrappers.js"></script>
+<script src="js/period_ui_delegate.js"></script>
+
+<script src="js/toolbar_delegate.js"></script>
+<script src="js/sheet_admin_delegate.js"></script>
+<script src="js/user_admin_stub.js"></script>
+
+<script src="js/user_added_col_flag.js"></script>
+<script src="js/resource_level_n_buttons.js"></script>
+<script src="js/model_all_required_company_bu.js"></script>
+<script src="js/required_fields_guide.js"></script>
+<script src="js/required_legend.js"></script>
+<script src="js/company_row_lock.js"></script>
+
+<script src="js/custom_rules.js"></script>
+
+<!-- ✅ IMPORTANT: init MUST be last -->
+<script src="js/app_init.js"></script>
+
+<!-- ========= END BLOCK: 90_SCRIPTS_ALL ========= -->
+
+
+
+  <!-- ======================================
+  BLOCK: 91_ROLE_GUARD_ADMIN_ONLY_UI
+  AREA: BODY END / remove admin-only UI for non-admin
+  SAFE TO REPLACE WHOLE BLOCK
+  NOTES:
+    - Admin: keep everything
+    - User : remove anything with data-admin-only="1"
+  ====================================== -->
+  <script>
+    (function adminOnlyUIGuard(){
+      try{
+        var role = String(sessionStorage.getItem("role") || "user").toLowerCase();
+        var isAdmin = (role === "admin");
+        if (isAdmin) return;
+
+        // remove ALL admin-only elements (options, buttons, inputs...)
+        var nodes = document.querySelectorAll('[data-admin-only="1"]');
+        nodes.forEach(function(n){
+          if (n && n.parentNode) n.parentNode.removeChild(n);
+        });
+      }catch(e){
+        // fail-safe: do nothing
+      }
+    })();
+  </script>
+  <!-- ========= END BLOCK: 91_ROLE_GUARD_ADMIN_ONLY_UI ========= -->
+
+</body>
+</html>
