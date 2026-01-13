@@ -43,7 +43,8 @@ console.log("custom_rules.js loaded - v2026-01-10a");
   SAFE TO REPLACE WHOLE MODULE
 ========================================================= */
 (function bindActionMenu(){
-  function $(id){ return document.getElementById(id); }
+  // ✅ 使用全域的 $ 函數（從 utils.js 透過 utils_globals.js 暴露）
+  const $ = window.DEFS?.UTILS?.$ || window.$ || ((id) => document.getElementById(id));
 
   function trigger(id){
     const el = $(id);
