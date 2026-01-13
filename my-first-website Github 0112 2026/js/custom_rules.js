@@ -1563,6 +1563,12 @@ function runChecksForActiveSheet(){
     return;
   }
 
+  // ✅ DEBUG: 顯示 activeKey 和可用的規則 keys
+  console.log("🔍 [DEBUG] activeKey:", activeKey);
+  console.log("🔍 [DEBUG] CHECKS_BY_SHEET keys:", Object.keys(CHECKS));
+  console.log("🔍 [DEBUG] CHECKS_BY_SHEET['nc'] exists:", typeof CHECKS["nc"]);
+  console.log("🔍 [DEBUG] window.DEFS.CHECKS.normalCapacity exists:", typeof window.DEFS?.CHECKS?.normalCapacity);
+  
   // ✅ 確保 activeKey 能正確對應到 CHECKS_BY_SHEET
   let fn = null;
   
@@ -1571,8 +1577,18 @@ function runChecksForActiveSheet(){
     fn = CHECKS[activeKey];
   }
   
-  // 如果找不到，顯示錯誤
+  // ✅ 如果找不到且 activeKey 是 "nc"，嘗試直接使用 window.DEFS.CHECKS.normalCapacity
+  if (typeof fn !== "function" && activeKey === "nc") {
+    const checkFn = window.DEFS?.CHECKS?.normalCapacity;
+    if (typeof checkFn === "function") {
+      console.log("🔍 [DEBUG] Using window.DEFS.CHECKS.normalCapacity directly");
+      fn = checkFn;
+    }
+  }
+  
+  // 如果還是找不到，顯示錯誤
   if (typeof fn !== "function") {
+    console.warn("⚠️ [DEBUG] No function found for activeKey:", activeKey);
     setCheckStatusForCurrentSheet(
       "warn",
       "Check",
