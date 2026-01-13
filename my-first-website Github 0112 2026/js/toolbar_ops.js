@@ -5,7 +5,8 @@ console.log("✅ [toolbar_ops.js] loaded");
 window.DEFS = window.DEFS || {};
 window.DEFS.TOOLBAR_OPS = window.DEFS.TOOLBAR_OPS || {};
 
-// ✅ GLOBAL: 任何地方呼叫都不會炸
+// ✅ GLOBAL shim (最重要)：任何地方呼叫都不會 ReferenceError
+// 有人直接呼叫 `_syncDelColBtnVisibility()` 也能活
 function _syncDelColBtnVisibility(){
   try{
     const btn = document.getElementById("delColBtn");
@@ -16,47 +17,33 @@ window._syncDelColBtnVisibility = _syncDelColBtnVisibility;
 // ======================= BLOCK: 00_FILE_HEADER END =======================
 
 
+(function installToolbarOps(){
+  // ======================= BLOCK: 01_INSTALL_GUARD_START =======================
+  if (window.__TOOLBAR_OPS_INSTALLED__) return;
+  window.__TOOLBAR_OPS_INSTALLED__ = true;
 
-// ======================= BLOCK: 01_INSTALL_GUARD_START =======================
-if (window.__TOOLBAR_OPS_INSTALLED__) return;
-window.__TOOLBAR_OPS_INSTALLED__ = true;
+  let CTX = null;
 
-let CTX = null;
+  function bind(ctx){
+    CTX = ctx || {};
+  }
 
-function bind(ctx){
-  CTX = ctx || {};
-}
-
-// ✅ 先保證全域一定存在（避免 installToolbarOps 內任何地方先呼叫就炸）
-if (typeof window._syncDelColBtnVisibility !== "function") {
-  window._syncDelColBtnVisibility = function(){
+  // ✅ 統一出口：本檔內部一律呼叫這個（不要再宣告同名 function 造成覆蓋混亂）
+  function syncDelColBtnVisibility(){
     try{
-      const btn = document.getElementById("delColBtn");
-      if (btn) btn.style.display = "";
+      _syncDelColBtnVisibility(); // global shim
     } catch(_e){}
-  };
-}
-function _syncDelColBtnVisibility(){
-  return window._syncDelColBtnVisibility();
-}
-// ======================= BLOCK: 01_INSTALL_GUARD_END =======================
+    try{
+      _forceShowDelColBtn();
+    } catch(_e){}
+    try{
+      _syncFloatingUI();
+    } catch(_e){}
+  }
+  // ======================= BLOCK: 01_INSTALL_GUARD_END =======================
 
 
-// ======================= BLOCK: 02A_SYNC_DEL_COL_VISIBILITY_START =======================
-function _syncDelColBtnVisibility(){
-  try{
-    // 你現在的策略：Delete Column 永遠顯示
-    _forceShowDelColBtn();
-
-    // 同步浮動 -Col UI（如果有裝）
-    try{ _syncFloatingUI(); } catch(_e){}
-  } catch(_e){}
-}
-// ======================= BLOCK: 02A_SYNC_DEL_COL_VISIBILITY_END =======================
-
-
-  
-     // ======================= BLOCK: 02_HELPERS_START =======================
+  // ======================= BLOCK: 02_HELPERS_START =======================
   function _roleIsAdminFallback(){
     const role = String(sessionStorage.getItem("role") || "user").toLowerCase();
     return role === "admin";
@@ -68,6 +55,7 @@ function _syncDelColBtnVisibility(){
   function _getActiveKey(){
     return (CTX && CTX.activeKey) ? CTX.activeKey : (window.activeKey || "company");
   }
+
   function _getDefMapByMode(mode){
     if (mode === "period") {
       return (
@@ -99,7 +87,7 @@ function _syncDelColBtnVisibility(){
     const $ = (CTX && CTX.$) ? CTX.$ : ((id)=>document.getElementById(id));
     const btn = $("delColBtn");
     if (!btn) return;
-    btn.style.display = ""; // 強制顯示
+    btn.style.display = "";
   }
 
   // ✅ 硬保護：有人把它藏起來，就立刻顯示回來
@@ -111,18 +99,15 @@ function _syncDelColBtnVisibility(){
       try{ _forceShowDelColBtn(); } catch(_e){}
     }
 
-    // 1) 立即做一次
     tick();
 
-    // 2) 短時間多次補強（避免 init 後又被別人藏）
     let n = 0;
     const timer = setInterval(() => {
       n++;
       tick();
-      if (n >= 50) clearInterval(timer); // 約 5 秒
+      if (n >= 50) clearInterval(timer);
     }, 100);
 
-    // 3) 監聽 DOM 變動（有人改 style/class 時）
     try{
       const obs = new MutationObserver(() => tick());
       obs.observe(document.documentElement, { attributes:true, subtree:true, childList:true });
@@ -144,32 +129,31 @@ function _syncDelColBtnVisibility(){
   }
 
   function _sheetToAOA_NoRowNumber(s, sheetKey){
-    const { ensureSize, activeMode, ensureDafMeta } = CTX;
-    ensureSize(s);
+    const { ensureSize, activeMode, ensureDafMeta } = CTX || {};
+    if (ensureSize) ensureSize(s);
 
     if (activeMode === "period" && sheetKey === "daf") {
-      ensureDafMeta(s);
+      if (ensureDafMeta) ensureDafMeta(s);
 
-      const row1 = Array.from({ length: s.cols }, (_, c) => String(s.headers[c] ?? ""));
-      const row2 = Array.from({ length: s.cols }, (_, c) => (c < 3 ? "" : String(s.meta.dafDesc[c] ?? "")));
-      const row3 = Array.from({ length: s.cols }, (_, c) => (c < 3 ? "" : String(s.meta.dafEnt[c] ?? "")));
+      const row1 = Array.from({ length: s.cols }, (_, c) => String(s.headers?.[c] ?? ""));
+      const row2 = Array.from({ length: s.cols }, (_, c) => (c < 3 ? "" : String(s.meta?.dafDesc?.[c] ?? "")));
+      const row3 = Array.from({ length: s.cols }, (_, c) => (c < 3 ? "" : String(s.meta?.dafEnt?.[c] ?? "")));
 
       const aoa = [row1, row2, row3];
       for (let r = 0; r < s.rows; r++) {
-        aoa.push(Array.from({ length: s.cols }, (_, c) => (s.data[r][c] ?? "")));
+        aoa.push(Array.from({ length: s.cols }, (_, c) => (s.data?.[r]?.[c] ?? "")));
       }
       return aoa;
     }
 
     const aoa = [];
-    aoa.push(Array.from({ length: s.cols }, (_, c) => (s.headers[c] ?? "")));
+    aoa.push(Array.from({ length: s.cols }, (_, c) => (s.headers?.[c] ?? "")));
     for (let r = 0; r < s.rows; r++) {
-      aoa.push(Array.from({ length: s.cols }, (_, c) => (s.data[r][c] ?? "")));
+      aoa.push(Array.from({ length: s.cols }, (_, c) => (s.data?.[r]?.[c] ?? "")));
     }
     return aoa;
   }
   // ======================= BLOCK: 02_HELPERS_END =======================
-
 
 
   // ======================= BLOCK: 02B_FLOATING_COL_UI_START =======================
@@ -218,6 +202,7 @@ function _syncDelColBtnVisibility(){
     if (render) render();
     _save();
     _syncFloatingUI();
+    syncDelColBtnVisibility();
   }
 
   function _delCol(){
@@ -230,7 +215,6 @@ function _syncDelColBtnVisibility(){
     s.cols = Number(s.cols||0) - 1;
     _ensureHeadersLen(s);
 
-    // DAF meta trim（period/daf）
     try{
       if (_getActiveMode() === "period" && _getActiveKey() === "daf" && s.meta){
         if (Array.isArray(s.meta.dafDesc)) s.meta.dafDesc.length = s.cols;
@@ -244,6 +228,7 @@ function _syncDelColBtnVisibility(){
     if (render) render();
     _save();
     _syncFloatingUI();
+    syncDelColBtnVisibility();
   }
 
   function _syncFloatingUI(){
@@ -308,7 +293,6 @@ function _syncDelColBtnVisibility(){
 
       _syncFloatingUI();
 
-      // 任何 DOM 大改動後也同步一次（保險）
       try{
         const obs = new MutationObserver(() => _syncFloatingUI());
         obs.observe(document.documentElement, { childList:true, subtree:true });
@@ -324,157 +308,349 @@ function _syncDelColBtnVisibility(){
   // ======================= BLOCK: 02B_FLOATING_COL_UI_END =======================
 
 
-
   // ======================= BLOCK: 03_BIND_TOOLBAR_EVENTS_START =======================
-function bindToolbarEvents(){
-  if (!CTX) return;
+  function bindToolbarEvents(){
+    if (!CTX) return;
 
-  _installFloatingColUI();
-  if (bindToolbarEvents.__bound) return;
-  bindToolbarEvents.__bound = true;
+    _installFloatingColUI();
+    if (bindToolbarEvents.__bound) return;
+    bindToolbarEvents.__bound = true;
 
-  const {
-    $, on, t, lang, isAdmin,
-    sheets, activeSheet,
-    ensureHeadersForActiveSheet, ensureSize, ensureDafMeta,
-    saveToLocalByMode, loadPeriodList, savePeriodList, setActivePeriod,
-    applySheetDefsByModeAndTrim, resetSheetsToBlankForMode,
-    isSheetVisible, openPeriodModal,
-    storageKeyByMode, documentMeta,
-    showErr, downloadTextFile, csvCell,
-    render, refreshUI, setActive, ensureActiveKeyVisible
-  } = CTX;
+    const {
+      $, on, t, lang, isAdmin,
+      sheets, activeSheet,
+      ensureHeadersForActiveSheet, ensureSize, ensureDafMeta,
+      saveToLocalByMode, loadPeriodList, savePeriodList, setActivePeriod,
+      applySheetDefsByModeAndTrim, resetSheetsToBlankForMode,
+      isSheetVisible, openPeriodModal,
+      storageKeyByMode, documentMeta,
+      showErr, downloadTextFile, csvCell,
+      render, refreshUI, setActive, ensureActiveKeyVisible
+    } = CTX;
 
-  _installDelColBtnKeeper();
-  _forceShowDelColBtn();
-
-  // -------------------------
-  // Add Row
-  // -------------------------
-  on("addRowBtn","click", () => {
-    const s = activeSheet();
-    if (!s) return;
-
-    s.rows += 1;
-    render();
-    saveToLocalByMode(CTX.activeMode);
-
-    // ✅ 防呆呼叫（不再直接呼叫內部函式）
-    window.DEFS?.TOOLBAR_OPS?.syncDelColBtnVisibility?.();
-  });
-
-  // -------------------------
-  // Add Column
-  // -------------------------
-  on("addColBtn","click", () => {
-    const s = activeSheet();
-    if (!s) return;
-
-    s.cols += 1;
-
-    if (!Array.isArray(s.headers)) s.headers = [];
-    while (s.headers.length < s.cols) s.headers.push("");
-
-    ensureHeadersForActiveSheet();
-    render();
-    saveToLocalByMode(CTX.activeMode);
-
-    // ✅ 防呆呼叫
-    window.DEFS?.TOOLBAR_OPS?.syncDelColBtnVisibility?.();
-  });
-
-  // -------------------------
-  // Delete Column (ALWAYS VISIBLE; just block at minCols)
-  // -------------------------
-  on("delColBtn","click", () => {
+    _installDelColBtnKeeper();
     _forceShowDelColBtn();
+    syncDelColBtnVisibility();
 
-    const s = activeSheet();
-    if (!s) return;
+    // Add Row
+    on("addRowBtn","click", () => {
+      const s = activeSheet();
+      if (!s) return;
+      s.rows += 1;
+      render();
+      saveToLocalByMode(CTX.activeMode);
+      syncDelColBtnVisibility();
+    });
 
-    const minCols = _minColsForActiveSheet();
-    if (Number(s.cols || 0) <= Number(minCols || 0)) {
-      alert(t("alert_min_cols")(minCols));
-      return;
-    }
+    // Add Column
+    on("addColBtn","click", () => {
+      const s = activeSheet();
+      if (!s) return;
 
-    s.cols -= 1;
-    if (Array.isArray(s.headers)) s.headers.length = s.cols;
+      s.cols += 1;
+      if (!Array.isArray(s.headers)) s.headers = [];
+      while (s.headers.length < s.cols) s.headers.push("");
 
-    if (CTX.activeMode === "period" && CTX.activeKey === "daf" && s.meta) {
-      if (Array.isArray(s.meta.dafDesc)) s.meta.dafDesc.length = s.cols;
-      if (Array.isArray(s.meta.dafEnt))  s.meta.dafEnt.length  = s.cols;
-    }
+      ensureHeadersForActiveSheet();
+      render();
+      saveToLocalByMode(CTX.activeMode);
+      syncDelColBtnVisibility();
+    });
 
-    if (Array.isArray(s.data)) {
-      for (let r=0; r<s.data.length; r++){
-        if (Array.isArray(s.data[r])) s.data[r].length = s.cols;
+    // Delete Column (ALWAYS VISIBLE; block at minCols)
+    on("delColBtn","click", () => {
+      _forceShowDelColBtn();
+
+      const s = activeSheet();
+      if (!s) return;
+
+      const minCols = _minColsForActiveSheet();
+      if (Number(s.cols || 0) <= Number(minCols || 0)) {
+        alert(t("alert_min_cols")(minCols));
+        return;
       }
-    }
 
-    render();
-    saveToLocalByMode(CTX.activeMode);
+      s.cols -= 1;
+      if (Array.isArray(s.headers)) s.headers.length = s.cols;
 
-    _forceShowDelColBtn();
-  });
+      if (CTX.activeMode === "period" && CTX.activeKey === "daf" && s.meta) {
+        if (Array.isArray(s.meta.dafDesc)) s.meta.dafDesc.length = s.cols;
+        if (Array.isArray(s.meta.dafEnt))  s.meta.dafEnt.length  = s.cols;
+      }
+      if (Array.isArray(s.data)) {
+        for (let r=0; r<s.data.length; r++){
+          if (Array.isArray(s.data[r])) s.data[r].length = s.cols;
+        }
+      }
 
-  // -------------------------
-  // Clear Local
-  // -------------------------
-  on("clearLocalBtn","click", () => {
-    try {
-      if (CTX.activeMode === "period") {
-        if (!CTX.activePeriod) {
-          alert(lang==="en" ? "No Period selected, cannot clear." : "目前沒有選 Period，無法清除。");
+      render();
+      saveToLocalByMode(CTX.activeMode);
+      syncDelColBtnVisibility();
+    });
+
+    // Export CSV (NO row-number column)
+    on("exportCsvBtn","click", () => {
+      const s = activeSheet();
+      ensureHeadersForActiveSheet();
+      ensureSize(s);
+
+      const lines = [];
+
+      if (CTX.activeMode === "period" && CTX.activeKey === "daf") {
+        ensureDafMeta(s);
+
+        const row1 = Array.from({ length: s.cols }, (_, c) => (s.headers[c] ?? ""));
+        const row2 = Array.from({ length: s.cols }, (_, c) => (c < 3 ? "" : (s.meta.dafDesc[c] ?? "")));
+        const row3 = Array.from({ length: s.cols }, (_, c) => (c < 3 ? "" : (s.meta.dafEnt[c] ?? "")));
+
+        lines.push(row1.map(csvCell).join(","));
+        lines.push(row2.map(csvCell).join(","));
+        lines.push(row3.map(csvCell).join(","));
+      } else {
+        const header = Array.from({ length: s.cols }, (_, c) => (s.headers[c] ?? ""));
+        lines.push(header.map(csvCell).join(","));
+      }
+
+      for (let r=0; r<s.rows; r++) {
+        const row = Array.from({ length: s.cols }, (_, c) => (s.data[r][c] ?? ""));
+        lines.push(row.map(csvCell).join(","));
+      }
+
+      const blob = new Blob([lines.join("\n")], { type:"text/csv;charset=utf-8;" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = (s.title || "Sheet") + ".csv";
+      a.click();
+      URL.revokeObjectURL(url);
+    });
+
+    // Export XLSX (NO row-number column)
+    on("exportXlsxBtn","click", () => {
+      try {
+        if (!window.XLSX) throw new Error("SheetJS 沒有載入成功（window.XLSX 不存在）");
+        if (CTX.activeMode === "period" && !CTX.activePeriod) {
+          alert(lang==="en"
+            ? "Please create/select a Period (yyyy-mm) before exporting."
+            : "請先建立或選擇一個 Period（yyyy-mm）再匯出。"
+          );
+          (window.DEFS?.PERIOD_UI?.openPeriodModal || openPeriodModal)?.();
           return;
         }
-        localStorage.removeItem(storageKeyByMode("period"));
-        resetSheetsToBlankForMode("period");
-        saveToLocalByMode("period");
-      } else {
-        localStorage.removeItem(storageKeyByMode("model"));
-        resetSheetsToBlankForMode("model");
-        saveToLocalByMode("model");
+
+        const wb = window.XLSX.utils.book_new();
+        wb.Props = wb.Props || {};
+        wb.Props.Company = documentMeta.companyName || "";
+
+        const used = new Set();
+        const orderKeys = (CTX.activeMode === "period")
+          ? ["company","bu","cr","ac","nc","act","daf","mach","mat","pp","prod","cust","mm","pmwip","epv","sr","rit","sd"]
+          : ["company","bu","cr","ac","nc","act","daf","mach","mat","pp","prod","cust","sd"];
+
+        orderKeys.forEach(k => {
+          if (!isSheetVisible(CTX.activeMode, k)) return;
+          const sh = sheets[k];
+          if (!sh) return;
+
+          if (CTX.activeMode === "period" && k === "daf") ensureDafMeta(sh);
+          const ws = window.XLSX.utils.aoa_to_sheet(_sheetToAOA_NoRowNumber(sh, k));
+          window.XLSX.utils.book_append_sheet(wb, ws, _makeSafeSheetName(sh.title, used));
+        });
+
+        const filename = (CTX.activeMode === "period") ? `Period_${CTX.activePeriod}.xlsx` : "Model.xlsx";
+        window.XLSX.writeFile(wb, filename);
+      } catch (err) { showErr(err); }
+    });
+
+    // JSON Export/Import (ADMIN ONLY) + HARD remove options for user
+    (function adminOnlyJsonOps(){
+      const admin =
+        (typeof isAdmin === "function") ? !!isAdmin() : _roleIsAdminFallback();
+
+      function removeEl(id){
+        const el = $(id);
+        if (el && el.parentNode) el.parentNode.removeChild(el);
       }
 
-      applySheetDefsByModeAndTrim();
-      ensureActiveKeyVisible();
-      refreshUI();
-      setActive(CTX.activeKey);
+      function scrubJsonOptionsEverywhere(){
+        const selects = Array.from(document.querySelectorAll("select"));
 
-      // ✅ 防呆呼叫
-      window.DEFS?.TOOLBAR_OPS?.syncDelColBtnVisibility?.();
-    } catch (err) {
-      showErr(err);
-    }
-  });
-}
-// ======================= BLOCK: 03_BIND_TOOLBAR_EVENTS_END =======================
+        const shouldRemoveOption = (opt) => {
+          const v  = String(opt?.value || "").toLowerCase().trim();
+          const tx = String(opt?.text  || opt?.textContent || "").toLowerCase().trim();
+          if (v === "export_json" || v === "import_json") return true;
+          if (v === "exportjson" || v === "importjson") return true;
+          if (tx.includes("export json")) return true;
+          if (tx.includes("import json")) return true;
+          if (tx.includes("workspace snapshot")) return true;
+          if (tx.includes("load workspace snapshot")) return true;
+          return false;
+        };
 
-// ======================= BLOCK: 04_EXPORTS_START =======================
-window.DEFS.TOOLBAR_OPS.bind = bind;
-window.DEFS.TOOLBAR_OPS.bindToolbarEvents = bindToolbarEvents;
+        selects.forEach(sel => {
+          const opts = Array.from(sel.options || []);
+          let removed = false;
 
-// ✅ 防呆：就算你忘了放 _syncDelColBtnVisibility，也不會在載入時 ReferenceError
-var _syncDelColBtnVisibility = function(){
-  try{ _forceShowDelColBtn(); } catch(_e){}
-  try{ _syncFloatingUI(); } catch(_e){}
-};
+          opts.forEach(opt => {
+            if (shouldRemoveOption(opt)) {
+              if (sel.value === opt.value) sel.selectedIndex = 0;
+              opt.remove();
+              removed = true;
+            }
+          });
 
-window.DEFS.TOOLBAR_OPS.syncDelColBtnVisibility = _syncDelColBtnVisibility;
-// ======================= BLOCK: 04_EXPORTS_END =======================
+          if (removed) {
+            const first = Array.from(sel.options || [])[0];
+            if (first) sel.value = first.value;
+          }
+        });
+      }
+
+      function startHardScrub(){
+        scrubJsonOptionsEverywhere();
+
+        if (!window.__JSON_SCRUB_OBS__) {
+          window.__JSON_SCRUB_OBS__ = true;
+          const obs = new MutationObserver(() => {
+            try { scrubJsonOptionsEverywhere(); } catch(_e){}
+          });
+          obs.observe(document.documentElement, { childList:true, subtree:true });
+        }
+
+        if (!window.__JSON_SCRUB_TIMER__) {
+          let n = 0;
+          window.__JSON_SCRUB_TIMER__ = setInterval(() => {
+            n++;
+            scrubJsonOptionsEverywhere();
+            if (n >= 60) {
+              clearInterval(window.__JSON_SCRUB_TIMER__);
+              window.__JSON_SCRUB_TIMER__ = null;
+            }
+          }, 100);
+        }
+
+        setTimeout(scrubJsonOptionsEverywhere, 300);
+        setTimeout(scrubJsonOptionsEverywhere, 1200);
+        setTimeout(scrubJsonOptionsEverywhere, 2500);
+      }
+
+      if (!admin) {
+        removeEl("exportJsonBtn");
+        removeEl("importJsonBtn");
+        removeEl("importJsonFile");
+        startHardScrub();
+        return;
+      }
+
+      on("exportJsonBtn","click", () => {
+        try {
+          if (CTX.activeMode === "period" && !CTX.activePeriod) {
+            alert(lang==="en"
+              ? "Please create/select a Period (yyyy-mm) before exporting."
+              : "請先建立或選擇一個 Period（yyyy-mm）再匯出。"
+            );
+            openPeriodModal();
+            return;
+          }
+
+          const filtered = {};
+          Object.keys(sheets).forEach(k => {
+            if (isSheetVisible(CTX.activeMode, k)) filtered[k] = sheets[k];
+          });
+
+          const payload = {
+            version: 2,
+            mode: CTX.activeMode,
+            period: (CTX.activeMode==="period" ? CTX.activePeriod : ""),
+            savedAt: new Date().toISOString(),
+            sheets: filtered
+          };
+
+          downloadTextFile(
+            CTX.activeMode === "period"
+              ? `Period_${CTX.activePeriod}_workspace.json`
+              : "Model_workspace.json",
+            JSON.stringify(payload, null, 2),
+            "application/json;charset=utf-8;"
+          );
+        } catch (err) { showErr(err); }
+      });
+
+      on("importJsonBtn","click", () => {
+        const inp = $("importJsonFile");
+        if (!inp) return;
+        inp.value = "";
+        inp.click();
+      });
+
+      on("importJsonFile","change", async () => {
+        try {
+          const file = $("importJsonFile")?.files?.[0];
+          if (!file) return;
+
+          const payload = JSON.parse(await file.text());
+          const incomingSheets = payload?.sheets ?? payload;
+          if (!incomingSheets || typeof incomingSheets !== "object") throw new Error("JSON 格式不正確：找不到 sheets");
+
+          for (const k in incomingSheets) if (sheets[k]) Object.assign(sheets[k], incomingSheets[k]);
+
+          if (payload?.mode === "model" || payload?.mode === "period") {
+            if (payload.mode !== CTX.activeMode) CTX.activeMode = payload.mode;
+          }
+
+          if (CTX.activeMode === "period" && payload?.period && /^\d{4}-\d{2}$/.test(payload.period)) {
+            const list = loadPeriodList();
+            if (!list.includes(payload.period)) { list.push(payload.period); savePeriodList(list); }
+            setActivePeriod(payload.period);
+          }
+
+          applySheetDefsByModeAndTrim();
+          saveToLocalByMode(CTX.activeMode);
+
+          CTX.activeKey = "company";
+          ensureActiveKeyVisible();
+          refreshUI();
+          setActive(CTX.activeKey);
+
+        } catch (err) { showErr(err); }
+      });
+    })();
+
+    // Clear Local
+    on("clearLocalBtn","click", () => {
+      try {
+        if (CTX.activeMode === "period") {
+          if (!CTX.activePeriod) {
+            alert(lang==="en" ? "No Period selected, cannot clear." : "目前沒有選 Period，無法清除。");
+            return;
+          }
+          localStorage.removeItem(storageKeyByMode("period"));
+          resetSheetsToBlankForMode("period");
+          saveToLocalByMode("period");
+        } else {
+          localStorage.removeItem(storageKeyByMode("model"));
+          resetSheetsToBlankForMode("model");
+          saveToLocalByMode("model");
+        }
+
+        applySheetDefsByModeAndTrim();
+        ensureActiveKeyVisible();
+        refreshUI();
+        setActive(CTX.activeKey);
+
+        syncDelColBtnVisibility();
+      } catch (err) { showErr(err); }
+    });
+  }
+  // ======================= BLOCK: 03_BIND_TOOLBAR_EVENTS_END =======================
 
 
-})();
+  // ======================= BLOCK: 04_EXPORTS_START =======================
+  window.DEFS.TOOLBAR_OPS.bind = bind;
+  window.DEFS.TOOLBAR_OPS.bindToolbarEvents = bindToolbarEvents;
 
+  // ✅ 給其他模組呼叫：統一走我們的安全函式
+  window.DEFS.TOOLBAR_OPS.syncDelColBtnVisibility = syncDelColBtnVisibility;
+  // ======================= BLOCK: 04_EXPORTS_END =======================
 
-
-
-
-
-
-
-
-
-
-
+})(); // end installToolbarOps IIFE
