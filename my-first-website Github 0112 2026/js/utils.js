@@ -1,5 +1,17 @@
 console.log("✅ utils.js loaded");
 
+
+// ======================= HOTFIX: _syncDelColBtnVisibility SHIM START =======================
+if (typeof window._syncDelColBtnVisibility !== "function") {
+  window._syncDelColBtnVisibility = function(){
+    try{
+      const btn = document.getElementById("delColBtn");
+      if (btn) btn.style.display = "";
+    } catch(_e){}
+  };
+}
+// ======================= HOTFIX: _syncDelColBtnVisibility SHIM END =======================
+
 window.DEFS = window.DEFS || {};
 window.DEFS.UTILS = window.DEFS.UTILS || {};
 
@@ -64,3 +76,4 @@ window.DEFS.UTILS = window.DEFS.UTILS || {};
   window.DEFS.UTILS.csvCell = csvCell;
   window.DEFS.UTILS.downloadTextFile = downloadTextFile;
 })();
+
