@@ -1545,6 +1545,10 @@ const CHECKS_BY_SHEET = {
 window.CHECKS_BY_SHEET = CHECKS_BY_SHEET;
 
 /* ✅ 主入口：只跑「目前分頁 activeKey」的規則 */
+// ✅ 註冊表守衛：確保 CHECKS_BY_SHEET 和 nc 規則存在
+window.CHECKS_BY_SHEET = window.CHECKS_BY_SHEET || {};
+window.CHECKS_BY_SHEET.nc = window.CHECKS_BY_SHEET.nc || window.DEFS?.CHECKS?.normalCapacity;
+
 function runChecksForActiveSheet(){
   // ✅ 單一註冊來源：使用 window.CHECKS_BY_SHEET 作為唯一來源
   const REG = window.CHECKS_BY_SHEET || {};
