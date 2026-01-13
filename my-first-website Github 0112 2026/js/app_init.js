@@ -1,6 +1,61 @@
 console.log("✅ [19] app_init loaded");
 
 /* =========================================================
+  DEBUG: Check Button Debug Badge (臨時調試指示器)
+========================================================= */
+(function createDebugBadge(){
+  function insertBadge(){
+    // 如果已存在，不重複建立
+    if (document.getElementById("dbgBadge")) return;
+    
+    const badge = document.createElement("div");
+    badge.id = "dbgBadge";
+    badge.style.cssText = `
+      position: fixed;
+      top: 10px;
+      right: 10px;
+      background: #1f2937;
+      color: #fbbf24;
+      padding: 8px 12px;
+      border-radius: 4px;
+      font-size: 11px;
+      font-family: monospace;
+      z-index: 99999;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+      line-height: 1.4;
+    `;
+    badge.textContent = "DEBUG: Ready";
+    
+    if (document.body) {
+      document.body.appendChild(badge);
+      console.log("✅ [app_init] Debug badge created");
+    } else {
+      setTimeout(insertBadge, 10);
+    }
+    
+    // ✅ 全域點擊捕捉：更新 badge 為 "CLICKED"
+    document.addEventListener("click", function(e){
+      const badgeEl = document.getElementById("dbgBadge");
+      if (badgeEl) {
+        badgeEl.textContent = "DEBUG: CLICKED";
+      }
+    }, true); // capture=true 捕捉階段
+  }
+  
+  // 在 DOMContentLoaded 時建立
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", insertBadge);
+  } else {
+    insertBadge();
+  }
+  
+  // 延遲建立（確保一定執行）
+  setTimeout(insertBadge, 0);
+  setTimeout(insertBadge, 100);
+  setTimeout(insertBadge, 500);
+})();
+
+/* =========================================================
   MODULE: 19_INIT
   AREA: init app (restore last active tab BEFORE first render to avoid flashing)
   SAFE TO REPLACE WHOLE MODULE
