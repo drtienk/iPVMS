@@ -1546,76 +1546,40 @@ window.CHECKS_BY_SHEET = CHECKS_BY_SHEET;
 
 /* ✅ 主入口：只跑「目前分頁 activeKey」的規則 */
 function runChecksForActiveSheet(){
-  // ✅ 使用全域的 CHECKS_BY_SHEET（確保是同一物件）
-  // 直接使用 window.CHECKS_BY_SHEET，確保是唯一的全域物件
-  const CHECKS = window.CHECKS_BY_SHEET;
+  // ✅ 單一註冊來源：使用 window.CHECKS_BY_SHEET 作為唯一來源
+  const REG = window.CHECKS_BY_SHEET || {};
   
-  // ✅ 確保 CHECKS_BY_SHEET 已定義
-  if (!CHECKS || typeof CHECKS !== "object") {
-    setCheckStatusForCurrentSheet(
-      "err",
-      "Check",
-      (lang==="en"
-        ? "Internal error: CHECKS_BY_SHEET not found."
-        : "內部錯誤：找不到 CHECKS_BY_SHEET。"
-      )
-    );
-    return;
-  }
-
-  // ✅ DEBUG: 顯示 activeKey 和可用的規則 keys
-  console.log("🔍 [DEBUG] activeKey:", activeKey);
-  console.log("🔍 [DEBUG] CHECKS_BY_SHEET keys:", Object.keys(CHECKS));
-  console.log("🔍 [DEBUG] CHECKS_BY_SHEET['nc'] exists:", typeof CHECKS["nc"]);
-  console.log("🔍 [DEBUG] window.DEFS.CHECKS.normalCapacity exists:", typeof window.DEFS?.CHECKS?.normalCapacity);
+  // ✅ 取得 activeKey（確保是字串且已 trim）
+  const key = (window.activeKey || "").trim();
   
-  // ✅ 確保 activeKey 能正確對應到 CHECKS_BY_SHEET
-  let fn = null;
+  // ✅ 從註冊表查找規則函數
+  let ruleFn = REG[key];
   
-  // 直接查找對應的檢查函數
-  if (CHECKS[activeKey] && typeof CHECKS[activeKey] === "function") {
-    fn = CHECKS[activeKey];
-  }
-  
-  // ✅ 如果找不到且 activeKey 是 "nc"，嘗試直接使用 window.DEFS.CHECKS.normalCapacity
-  if (typeof fn !== "function" && activeKey === "nc") {
+  // ✅ 最小 fallback：如果找不到且 key 是 "nc"，嘗試從 window.DEFS.CHECKS.normalCapacity 取得
+  if (!ruleFn && key === "nc") {
     const checkFn = window.DEFS?.CHECKS?.normalCapacity;
     if (typeof checkFn === "function") {
-      console.log("🔍 [DEBUG] Using window.DEFS.CHECKS.normalCapacity directly");
-      fn = checkFn;
+      ruleFn = checkFn;
+      // ✅ 回填到註冊表，確保一致性
+      REG["nc"] = ruleFn;
     }
   }
   
-  // 如果還是找不到，顯示錯誤
-  if (typeof fn !== "function") {
-    console.warn("⚠️ [DEBUG] No function found for activeKey:", activeKey);
+  // ✅ 如果還是找不到規則，顯示錯誤
+  if (typeof ruleFn !== "function") {
     setCheckStatusForCurrentSheet(
       "warn",
       "Check",
       (lang==="en"
-        ? `No check rules for this sheet: ${activeKey}`
-        : `此分頁尚未設定檢查規則：${activeKey}`
+        ? `No check rules for this sheet: ${key}`
+        : `此分頁尚未設定檢查規則：${key}`
       )
     );
     return;
   }
 
-  // ✅ DEBUG: 顯示規則執行指示器
-  const ruleName = activeKey === "nc" ? "checkNormalCapacitySheet -> window.DEFS.CHECKS.normalCapacity" : fn.name || "unknown";
-  if (window.updateDebugIndicator) {
-    window.updateDebugIndicator("RULE RAN: " + ruleName);
-  }
-  
-  const res = fn();
-  
-  // ✅ DEBUG: 顯示結果指示器
-  if (window.updateDebugIndicator) {
-    if (res && typeof res === "object") {
-      window.updateDebugIndicator("RESULT: " + (res.ok ? "ok" : "err") + "/" + (res.type || "?") + " - " + (res.msg || "").substring(0, 30));
-    } else {
-      window.updateDebugIndicator("RESULT: invalid (" + typeof res + ")");
-    }
-  }
+  // ✅ 執行規則函數
+  const res = ruleFn();
 
   // ✅ 處理檢查結果並顯示 UI
   if (!res || res.ok) {
@@ -1689,8 +1653,8 @@ window.runChecksForActiveSheet = runChecksForActiveSheet;
     // 確保 on 函數和 CHECKS_BY_SHEET 都已定義
     const onFn = window.DEFS?.UTILS?.on || window.on;
     if (typeof onFn !== "function") return false;
-    const CHECKS = window.CHECKS_BY_SHEET;
-    if (typeof CHECKS === "undefined") return false;
+    const REG = window.CHECKS_BY_SHEET;
+    if (typeof REG === "undefined") return false;
     
     // 確保 checkBtn 存在
     const checkBtn = document.getElementById("checkBtn");
@@ -1702,10 +1666,6 @@ window.runChecksForActiveSheet = runChecksForActiveSheet;
     
     // ✅ 綁定 Check 按鈕：所有分頁統一使用 runChecksForActiveSheet() 標準流程
     onFn("checkBtn", "click", function(){
-      // ✅ DEBUG: 顯示點擊指示器
-      if (window.updateDebugIndicator) {
-        window.updateDebugIndicator("CLICKED");
-      }
       runChecksForActiveSheet();
     });
     return true;
