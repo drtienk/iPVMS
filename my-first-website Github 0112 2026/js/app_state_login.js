@@ -16,17 +16,20 @@ console.log('✅ [02] app_state_login loaded');
   function computeLoginPage(){
     try{
       var p = String(location.pathname || "/");
-      // If we are already inside the app folder, "login.html" is correct.
-      if (p.indexOf("/my-first-website%20Github%200112%202026/") >= 0) return "login.html";
-
-      // If we are at repo root (/iPVMS/), we must go into the app folder.
-      if (p.indexOf("/iPVMS/") >= 0) {
-        return "my-first-website%20Github%200112%202026/login.html";
+      var decodedPath = decodeURIComponent(p);
+      
+      // If we are already inside the app folder (check both encoded and decoded paths)
+      if (p.indexOf("/my-first-website%20Github%200112%202026/") >= 0 || 
+          decodedPath.indexOf("/my-first-website Github 0112 2026/") >= 0 ||
+          p.indexOf("login.html") >= 0 || p.indexOf("app.html") >= 0) {
+        return "login.html";
       }
 
-      // Fallback: use same-folder login
-      return "login.html";
+      // If we are at repo root, navigate to app folder
+      // Use relative path - works in both local and GitHub Pages
+      return "my-first-website%20Github%200112%202026/login.html";
     }catch(e){
+      // Fallback: use same-folder login
       return "login.html";
     }
   }
