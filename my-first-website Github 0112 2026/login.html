@@ -381,6 +381,126 @@
     });
 
     /* =============================
+       從模板複製公司資料
+       ============================= */
+    function cloneCompanyFromTemplate(companyId, companyName) {
+      const templateId = TEMPLATE_COMPANY_ID;
+      const logPrefix = `[cloneCompanyFromTemplate]`;
+
+      console.log(`${logPrefix} Cloning: id="${companyId}", name="${companyName}", template="${templateId}"`);
+
+      let success = true;
+
+      // Clone sheet visibility
+      const visibilityKeyTemplate = `miniExcel_sheet_visibility_v1__${templateId}`;
+      const visibilityKeyNew = `miniExcel_sheet_visibility_v1__${companyId}`;
+      try {
+        const visibilityData = localStorage.getItem(visibilityKeyTemplate);
+        if (visibilityData) {
+          localStorage.setItem(visibilityKeyNew, visibilityData);
+          console.log(`${logPrefix} ✅ Cloned: ${visibilityKeyTemplate} -> ${visibilityKeyNew}`);
+        } else {
+          console.log(`${logPrefix} ⚠️ Template visibility not found: ${visibilityKeyTemplate}`);
+        }
+      } catch (err) {
+        console.error(`${logPrefix} ❌ Failed to clone visibility:`, err);
+        success = false;
+      }
+
+      // Clone check visibility per-tab
+      const checkVisibilityKeyTemplate = `check_visibility_per_tab_company_${templateId}`;
+      const checkVisibilityKeyNew = `check_visibility_per_tab_company_${companyId}`;
+      try {
+        const checkVisibilityData = localStorage.getItem(checkVisibilityKeyTemplate);
+        if (checkVisibilityData) {
+          localStorage.setItem(checkVisibilityKeyNew, checkVisibilityData);
+          console.log(`${logPrefix} ✅ Cloned: ${checkVisibilityKeyTemplate} -> ${checkVisibilityKeyNew}`);
+        } else {
+          console.log(`${logPrefix} ⚠️ Template check visibility not found: ${checkVisibilityKeyTemplate}`);
+        }
+      } catch (err) {
+        console.error(`${logPrefix} ❌ Failed to clone check visibility:`, err);
+        success = false;
+      }
+
+      // Clone model workspace
+      const modelKeyTemplate = `miniExcel_autosave_model_v4__${templateId}`;
+      const modelKeyNew = `miniExcel_autosave_model_v4__${companyId}`;
+      try {
+        const modelData = localStorage.getItem(modelKeyTemplate);
+        if (modelData) {
+          const parsed = JSON.parse(modelData);
+          // Clear all cell data, keep structure
+          const cloned = {};
+          for (const sheetKey in parsed) {
+            const sheet = parsed[sheetKey];
+            cloned[sheetKey] = {
+              headers: Array.isArray(sheet.headers) ? [...sheet.headers] : [],
+              cols: sheet.cols || 0,
+              rows: sheet.rows || 0,
+              meta: sheet.meta ? JSON.parse(JSON.stringify(sheet.meta)) : {},
+              data: Array(sheet.rows || 0).fill(null).map(() => Array(sheet.cols || 0).fill(""))
+            };
+          }
+          localStorage.setItem(modelKeyNew, JSON.stringify(cloned));
+          console.log(`${logPrefix} ✅ Cloned: ${modelKeyTemplate} -> ${modelKeyNew} (cleared data)`);
+        } else {
+          console.log(`${logPrefix} ⚠️ Template model workspace not found: ${modelKeyTemplate}`);
+        }
+      } catch (err) {
+        console.error(`${logPrefix} ❌ Failed to clone model workspace:`, err);
+        success = false;
+      }
+
+      // Clone period workspaces (clone all periods)
+      try {
+        const periodListKeyTemplate = `miniExcel_period_list_v1__${templateId}`;
+        const periodListKeyNew = `miniExcel_period_list_v1__${companyId}`;
+        const periodListData = localStorage.getItem(periodListKeyTemplate);
+        let periods = [];
+        if (periodListData) {
+          periods = JSON.parse(periodListData);
+          localStorage.setItem(periodListKeyNew, periodListData);
+          console.log(`${logPrefix} ✅ Cloned period list: ${periodListKeyTemplate} -> ${periodListKeyNew}`);
+        }
+
+        // Clone each period workspace
+        periods.forEach(period => {
+          const periodKeyTemplate = `miniExcel_autosave_period_v4__${templateId}__${period}`;
+          const periodKeyNew = `miniExcel_autosave_period_v4__${companyId}__${period}`;
+          try {
+            const periodData = localStorage.getItem(periodKeyTemplate);
+            if (periodData) {
+              const parsed = JSON.parse(periodData);
+              // Clear all cell data, keep structure
+              const cloned = {};
+              for (const sheetKey in parsed) {
+                const sheet = parsed[sheetKey];
+                cloned[sheetKey] = {
+                  headers: Array.isArray(sheet.headers) ? [...sheet.headers] : [],
+                  cols: sheet.cols || 0,
+                  rows: sheet.rows || 0,
+                  meta: sheet.meta ? JSON.parse(JSON.stringify(sheet.meta)) : {},
+                  data: Array(sheet.rows || 0).fill(null).map(() => Array(sheet.cols || 0).fill(""))
+                };
+              }
+              localStorage.setItem(periodKeyNew, JSON.stringify(cloned));
+              console.log(`${logPrefix} ✅ Cloned: ${periodKeyTemplate} -> ${periodKeyNew} (cleared data)`);
+            }
+          } catch (err) {
+            console.error(`${logPrefix} ❌ Failed to clone period workspace ${period}:`, err);
+            success = false;
+          }
+        });
+      } catch (err) {
+        console.error(`${logPrefix} ❌ Failed to clone period workspaces:`, err);
+        success = false;
+      }
+
+      return success;
+    }
+
+    /* =============================
        顯示公司下拉 + 載入公司
        ============================= */
     function showCompanyDropdown() {
@@ -432,7 +552,7 @@
       const newCompanyId = generateCompanyId(trimmedName);
       const templateId = TEMPLATE_COMPANY_ID;
 
-      console.log(`[createNewCompany] Creating: name="${trimmedName}", id="${newCompanyId}", template="${templateId}"`);
+      console.log(`[createNewCompany] Creating: name="${trimmedName}", id="${newCompanyId}"`);
 
       // Check if company already exists
       const directory = getCompanyDirectory();
@@ -441,107 +561,8 @@
         return;
       }
 
-      // Clone sheet visibility
-      const visibilityKeyTemplate = `miniExcel_sheet_visibility_v1__${templateId}`;
-      const visibilityKeyNew = `miniExcel_sheet_visibility_v1__${newCompanyId}`;
-      try {
-        const visibilityData = localStorage.getItem(visibilityKeyTemplate);
-        if (visibilityData) {
-          localStorage.setItem(visibilityKeyNew, visibilityData);
-          console.log(`[createNewCompany] ✅ Cloned: ${visibilityKeyTemplate} -> ${visibilityKeyNew}`);
-        } else {
-          console.log(`[createNewCompany] ⚠️ Template visibility not found: ${visibilityKeyTemplate}`);
-        }
-      } catch (err) {
-        console.error(`[createNewCompany] ❌ Failed to clone visibility:`, err);
-      }
-
-      // Clone check visibility per-tab
-      const checkVisibilityKeyTemplate = `check_visibility_per_tab_company_${templateId}`;
-      const checkVisibilityKeyNew = `check_visibility_per_tab_company_${newCompanyId}`;
-      try {
-        const checkVisibilityData = localStorage.getItem(checkVisibilityKeyTemplate);
-        if (checkVisibilityData) {
-          localStorage.setItem(checkVisibilityKeyNew, checkVisibilityData);
-          console.log(`[createNewCompany] ✅ Cloned: ${checkVisibilityKeyTemplate} -> ${checkVisibilityKeyNew}`);
-        } else {
-          console.log(`[createNewCompany] ⚠️ Template check visibility not found: ${checkVisibilityKeyTemplate}`);
-        }
-      } catch (err) {
-        console.error(`[createNewCompany] ❌ Failed to clone check visibility:`, err);
-      }
-
-      // Clone workspace data (model + period)
-      // Model workspace
-      const modelKeyTemplate = `miniExcel_autosave_model_v4__${templateId}`;
-      const modelKeyNew = `miniExcel_autosave_model_v4__${newCompanyId}`;
-      try {
-        const modelData = localStorage.getItem(modelKeyTemplate);
-        if (modelData) {
-          const parsed = JSON.parse(modelData);
-          // Clear all cell data, keep structure
-          const cloned = {};
-          for (const sheetKey in parsed) {
-            const sheet = parsed[sheetKey];
-            cloned[sheetKey] = {
-              headers: Array.isArray(sheet.headers) ? [...sheet.headers] : [],
-              cols: sheet.cols || 0,
-              rows: sheet.rows || 0,
-              meta: sheet.meta ? JSON.parse(JSON.stringify(sheet.meta)) : {},
-              data: Array(sheet.rows || 0).fill(null).map(() => Array(sheet.cols || 0).fill(""))
-            };
-          }
-          localStorage.setItem(modelKeyNew, JSON.stringify(cloned));
-          console.log(`[createNewCompany] ✅ Cloned: ${modelKeyTemplate} -> ${modelKeyNew} (cleared data)`);
-        } else {
-          console.log(`[createNewCompany] ⚠️ Template model workspace not found: ${modelKeyTemplate}`);
-        }
-      } catch (err) {
-        console.error(`[createNewCompany] ❌ Failed to clone model workspace:`, err);
-      }
-
-      // Period workspaces (clone all periods)
-      try {
-        const periodListKeyTemplate = `miniExcel_period_list_v1__${templateId}`;
-        const periodListKeyNew = `miniExcel_period_list_v1__${newCompanyId}`;
-        const periodListData = localStorage.getItem(periodListKeyTemplate);
-        let periods = [];
-        if (periodListData) {
-          periods = JSON.parse(periodListData);
-          localStorage.setItem(periodListKeyNew, periodListData);
-          console.log(`[createNewCompany] ✅ Cloned period list: ${periodListKeyTemplate} -> ${periodListKeyNew}`);
-        }
-
-        // Clone each period workspace
-        periods.forEach(period => {
-          const periodKeyTemplate = `miniExcel_autosave_period_v4__${templateId}__${period}`;
-          const periodKeyNew = `miniExcel_autosave_period_v4__${newCompanyId}__${period}`;
-          try {
-            const periodData = localStorage.getItem(periodKeyTemplate);
-            if (periodData) {
-              const parsed = JSON.parse(periodData);
-              // Clear all cell data, keep structure
-              const cloned = {};
-              for (const sheetKey in parsed) {
-                const sheet = parsed[sheetKey];
-                cloned[sheetKey] = {
-                  headers: Array.isArray(sheet.headers) ? [...sheet.headers] : [],
-                  cols: sheet.cols || 0,
-                  rows: sheet.rows || 0,
-                  meta: sheet.meta ? JSON.parse(JSON.stringify(sheet.meta)) : {},
-                  data: Array(sheet.rows || 0).fill(null).map(() => Array(sheet.cols || 0).fill(""))
-                };
-              }
-              localStorage.setItem(periodKeyNew, JSON.stringify(cloned));
-              console.log(`[createNewCompany] ✅ Cloned: ${periodKeyTemplate} -> ${periodKeyNew} (cleared data)`);
-            }
-          } catch (err) {
-            console.error(`[createNewCompany] ❌ Failed to clone period workspace ${period}:`, err);
-          }
-        });
-      } catch (err) {
-        console.error(`[createNewCompany] ❌ Failed to clone period workspaces:`, err);
-      }
+      // Clone from template
+      cloneCompanyFromTemplate(newCompanyId, trimmedName);
 
       // Add to directory
       directory.push({ companyName: trimmedName, companyId: newCompanyId });
@@ -685,98 +706,8 @@ return;
       let finalCompanyName = companyName;
 
       if (!existingCompany) {
-        // Create new company using existing createNewCompany logic
-        // Clone sheet visibility
-        const visibilityKeyTemplate = `miniExcel_sheet_visibility_v1__${templateId}`;
-        const visibilityKeyNew = `miniExcel_sheet_visibility_v1__${finalCompanyId}`;
-        try {
-          const visibilityData = localStorage.getItem(visibilityKeyTemplate);
-          if (visibilityData) {
-            localStorage.setItem(visibilityKeyNew, visibilityData);
-            console.log(`[confirmUserCompany] ✅ Cloned visibility: ${visibilityKeyTemplate} -> ${visibilityKeyNew}`);
-          }
-        } catch (err) {
-          console.error(`[confirmUserCompany] ❌ Failed to clone visibility:`, err);
-        }
-
-        // Clone check visibility per-tab
-        const checkVisibilityKeyTemplate = `check_visibility_per_tab_company_${templateId}`;
-        const checkVisibilityKeyNew = `check_visibility_per_tab_company_${finalCompanyId}`;
-        try {
-          const checkVisibilityData = localStorage.getItem(checkVisibilityKeyTemplate);
-          if (checkVisibilityData) {
-            localStorage.setItem(checkVisibilityKeyNew, checkVisibilityData);
-            console.log(`[confirmUserCompany] ✅ Cloned check visibility: ${checkVisibilityKeyTemplate} -> ${checkVisibilityKeyNew}`);
-          }
-        } catch (err) {
-          console.error(`[confirmUserCompany] ❌ Failed to clone check visibility:`, err);
-        }
-
-        // Clone model workspace
-        const modelKeyTemplate = `miniExcel_autosave_model_v4__${templateId}`;
-        const modelKeyNew = `miniExcel_autosave_model_v4__${finalCompanyId}`;
-        try {
-          const modelData = localStorage.getItem(modelKeyTemplate);
-          if (modelData) {
-            const parsed = JSON.parse(modelData);
-            const cloned = {};
-            for (const sheetKey in parsed) {
-              const sheet = parsed[sheetKey];
-              cloned[sheetKey] = {
-                headers: Array.isArray(sheet.headers) ? [...sheet.headers] : [],
-                cols: sheet.cols || 0,
-                rows: sheet.rows || 0,
-                meta: sheet.meta ? JSON.parse(JSON.stringify(sheet.meta)) : {},
-                data: Array(sheet.rows || 0).fill(null).map(() => Array(sheet.cols || 0).fill(""))
-              };
-            }
-            localStorage.setItem(modelKeyNew, JSON.stringify(cloned));
-            console.log(`[confirmUserCompany] ✅ Cloned model workspace: ${modelKeyTemplate} -> ${modelKeyNew} (cleared data)`);
-          }
-        } catch (err) {
-          console.error(`[confirmUserCompany] ❌ Failed to clone model workspace:`, err);
-        }
-
-        // Clone period workspaces
-        try {
-          const periodListKeyTemplate = `miniExcel_period_list_v1__${templateId}`;
-          const periodListKeyNew = `miniExcel_period_list_v1__${finalCompanyId}`;
-          const periodListData = localStorage.getItem(periodListKeyTemplate);
-          let periods = [];
-          if (periodListData) {
-            periods = JSON.parse(periodListData);
-            localStorage.setItem(periodListKeyNew, periodListData);
-            console.log(`[confirmUserCompany] ✅ Cloned period list: ${periodListKeyTemplate} -> ${periodListKeyNew}`);
-          }
-
-          periods.forEach(period => {
-            const periodKeyTemplate = `miniExcel_autosave_period_v4__${templateId}__${period}`;
-            const periodKeyNew = `miniExcel_autosave_period_v4__${finalCompanyId}__${period}`;
-            try {
-              const periodData = localStorage.getItem(periodKeyTemplate);
-              if (periodData) {
-                const parsed = JSON.parse(periodData);
-                const cloned = {};
-                for (const sheetKey in parsed) {
-                  const sheet = parsed[sheetKey];
-                  cloned[sheetKey] = {
-                    headers: Array.isArray(sheet.headers) ? [...sheet.headers] : [],
-                    cols: sheet.cols || 0,
-                    rows: sheet.rows || 0,
-                    meta: sheet.meta ? JSON.parse(JSON.stringify(sheet.meta)) : {},
-                    data: Array(sheet.rows || 0).fill(null).map(() => Array(sheet.cols || 0).fill(""))
-                  };
-                }
-                localStorage.setItem(periodKeyNew, JSON.stringify(cloned));
-                console.log(`[confirmUserCompany] ✅ Cloned period workspace: ${periodKeyTemplate} -> ${periodKeyNew} (cleared data)`);
-              }
-            } catch (err) {
-              console.error(`[confirmUserCompany] ❌ Failed to clone period workspace ${period}:`, err);
-            }
-          });
-        } catch (err) {
-          console.error(`[confirmUserCompany] ❌ Failed to clone period workspaces:`, err);
-        }
+        // Create new company by cloning from template
+        cloneCompanyFromTemplate(finalCompanyId, finalCompanyName);
 
         // Add to directory
         directory.push({ companyName: finalCompanyName, companyId: finalCompanyId });
