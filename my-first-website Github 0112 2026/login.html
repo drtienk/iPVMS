@@ -1153,11 +1153,11 @@ return;
     }
   </script>
 
-  <!-- ✅ Check visibility UI (admin login page only) -->
+  <!-- ✅ Check visibility store (needed for company cloning logic) -->
   <!-- Load tabs_def.js first to get TAB_CONFIG -->
   <script src="js/tabs_def.js"></script>
   <script src="js/check_visibility_store.js"></script>
-  <script src="js/check_visibility_ui.js"></script>
+  <!-- Note: check_visibility_ui.js is NOT loaded here to prevent showing "Allow users to see Check button" UI on login page -->
 
 </body>
 </html>
