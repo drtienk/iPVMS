@@ -122,6 +122,13 @@
       <button id="createCompanyBtn" type="button" style="display:none; margin-top:8px; width:100%; padding:8px; background:#10b981; color:#fff; border:0; border-radius:8px; cursor:pointer; font-weight:600;">Create New Company</button>
     </div>
 
+    <!-- User Company Name Input: 預設隱藏 -->
+    <div id="userCompanyRow" style="display:none;">
+      <label id="userCompanyLabel">Enter Company Name</label>
+      <input id="userCompanyName" type="text" placeholder="e.g., John.co">
+      <button id="confirmCompanyBtn" type="button" style="margin-top:8px; width:100%; padding:8px; background:#10b981; color:#fff; border:0; border-radius:8px; cursor:pointer; font-weight:600;">Confirm</button>
+    </div>
+
     <button id="loginBtn" onclick="login()">Next</button>
     <button id="backBtn" onclick="goBack()" style="display:none;">Back</button>
 
@@ -134,20 +141,8 @@
        ============================= */
       const USER_ACCOUNTS = {
         admin: { password: "admin", role: "admin" },
-
-        user1: {
-          password: "user1",
-          role: "user",
-          companyId: "TEST_CO",
-          companyName: "TEST CO."
-        },
-
-        user2: {
-          password: "user2",
-          role: "user",
-          companyId: "ABC_CO",
-          companyName: "ABC CO."
-        }
+        user1: { password: "user1", role: "user" },
+        user2: { password: "user2", role: "user" }
       };
 
 
@@ -204,6 +199,41 @@
     });
 
     let isAdminVerified = false;
+    let isUserVerified = false;
+    let currentUsername = "";
+
+    /* =============================
+       User Company Binding Helpers
+       ============================= */
+    const USER_COMPANY_MAP_KEY = "miniExcel_user_company_map_v1";
+
+    function loadUserCompanyMap() {
+      try {
+        const raw = localStorage.getItem(USER_COMPANY_MAP_KEY);
+        if (!raw) return {};
+        const parsed = JSON.parse(raw);
+        return typeof parsed === "object" && parsed !== null ? parsed : {};
+      } catch {
+        return {};
+      }
+    }
+
+    function saveUserCompany(username, companyId, companyName) {
+      try {
+        const map = loadUserCompanyMap();
+        map[username] = { companyId, companyName };
+        localStorage.setItem(USER_COMPANY_MAP_KEY, JSON.stringify(map));
+        return true;
+      } catch (err) {
+        console.error("[login] Failed to save user company binding:", err);
+        return false;
+      }
+    }
+
+    function getUserCompany(username) {
+      const map = loadUserCompanyMap();
+      return map[username] || null;
+    }
 
     /* =============================
        ✅ 語言系統：預設英文、可切中文
@@ -218,10 +248,14 @@
         companyLabel: "Company (Admin only)",
         companyPlaceholder: "-- Select a company --",
         btnCreateCompany: "Create New Company",
+        userCompanyLabel: "Enter Company Name",
+        userCompanyPlaceholder: "e.g., John.co",
+        btnConfirm: "Confirm",
         btnNext: "Next",
         btnLogin: "Login",
         btnBack: "Back",
         msgPickCompany: "Please select a company",
+        msgEnterCompany: "Please enter company name",
         msgBadCred: "Invalid username or password",
         msgRoleErr: "Role configuration error"
       },
@@ -234,10 +268,14 @@
         companyLabel: "公司（僅限管理員）",
         companyPlaceholder: "-- 請選擇公司 --",
         btnCreateCompany: "建立新公司",
+        userCompanyLabel: "輸入公司名稱",
+        userCompanyPlaceholder: "例如：John.co",
+        btnConfirm: "確認",
         btnNext: "下一步",
         btnLogin: "登入",
         btnBack: "回到上一頁",
         msgPickCompany: "請選擇公司",
+        msgEnterCompany: "請輸入公司名稱",
         msgBadCred: "帳號或密碼錯誤",
         msgRoleErr: "角色設定錯誤"
       }
@@ -262,6 +300,13 @@
       const createBtn = document.getElementById("createCompanyBtn");
       if (createBtn) createBtn.textContent = t.btnCreateCompany;
 
+      const userCompanyLabel = document.getElementById("userCompanyLabel");
+      if (userCompanyLabel) userCompanyLabel.textContent = t.userCompanyLabel;
+      const userCompanyInput = document.getElementById("userCompanyName");
+      if (userCompanyInput) userCompanyInput.placeholder = t.userCompanyPlaceholder;
+      const confirmBtn = document.getElementById("confirmCompanyBtn");
+      if (confirmBtn) confirmBtn.textContent = t.btnConfirm;
+
       // 公司下拉第一個選項文字
       const companySelect = document.getElementById("company");
       if (companySelect && companySelect.options.length > 0) {
@@ -269,7 +314,7 @@
       }
 
       // 按鈕文字要依「目前是第幾步」決定
-      document.getElementById("loginBtn").textContent = (isAdminVerified ? t.btnLogin : t.btnNext);
+      document.getElementById("loginBtn").textContent = (isAdminVerified || isUserVerified ? t.btnLogin : t.btnNext);
       document.getElementById("backBtn").textContent = t.btnBack;
 
       // msg 不強制翻譯舊內容（避免切語言把訊息弄亂），切語言先清空
@@ -296,6 +341,7 @@
       // 預設隱藏公司列
       document.getElementById("companyRow").style.display = "none";
       document.getElementById("company").disabled = true;
+      document.getElementById("userCompanyRow").style.display = "none";
 
       // Bind create company button
       const createBtn = document.getElementById("createCompanyBtn");
@@ -303,16 +349,28 @@
         createBtn.addEventListener("click", createNewCompany);
       }
 
+      // Bind confirm company button
+      const confirmCompanyBtn = document.getElementById("confirmCompanyBtn");
+      if (confirmCompanyBtn) {
+        confirmCompanyBtn.addEventListener("click", confirmUserCompany);
+      }
+
       // 焦點
       document.getElementById("username").focus();
 
-      // Enter 觸發登入（選單上不觸發）
+      // Enter 觸發登入或確認（選單上不觸發）
       document.addEventListener("keydown", (e) => {
         if (e.key !== "Enter") return;
         const active = document.activeElement;
         if (active && active.tagName === "SELECT") return;
         e.preventDefault();
-        login();
+        
+        // 如果在公司名稱輸入框，觸發確認
+        if (active && active.id === "userCompanyName") {
+          confirmUserCompany();
+        } else {
+          login();
+        }
       });
     });
 
@@ -545,16 +603,24 @@ return;
 
       }
 
-      // user 直接登入
-      // user 直接登入（公司已綁定）
+      // user 登入流程
       if (account.role === "user") {
+        const userCompany = getUserCompany(u);
+        
+        // 如果沒有綁定公司，顯示公司名稱輸入畫面
+        if (!userCompany) {
+          isUserVerified = true;
+          currentUsername = u;
+          showUserCompanyInput();
+          msgEl.textContent = t.msgEnterCompany;
+          return;
+        }
+
+        // 如果有綁定，直接登入
         sessionStorage.setItem("loggedIn", "yes");
         sessionStorage.setItem("role", "user");
-
-        // ✅ 自動帶公司
-        sessionStorage.setItem("companyId", account.companyId);
-        sessionStorage.setItem("companyName", account.companyName);
-
+        sessionStorage.setItem("companyId", userCompany.companyId);
+        sessionStorage.setItem("companyName", userCompany.companyName);
         window.location.href = "./app.html";
         return;
       }
@@ -564,26 +630,209 @@ return;
     }
 
     /* =============================
+       顯示使用者公司名稱輸入畫面
+       ============================= */
+    function showUserCompanyInput() {
+      const userCompanyRow = document.getElementById("userCompanyRow");
+      const loginBtn = document.getElementById("loginBtn");
+      const backBtn = document.getElementById("backBtn");
+      const usernameInput = document.getElementById("username");
+      const passwordInput = document.getElementById("password");
+      const t = I18N[getLang()] || I18N.en;
+
+      userCompanyRow.style.display = "block";
+      loginBtn.style.display = "none";
+      backBtn.style.display = "block";
+      usernameInput.disabled = true;
+      passwordInput.disabled = true;
+
+      loginBtn.textContent = t.btnLogin;
+      backBtn.textContent = t.btnBack;
+
+      const userCompanyInput = document.getElementById("userCompanyName");
+      if (userCompanyInput) {
+        userCompanyInput.focus();
+        userCompanyInput.value = "";
+      }
+    }
+
+    /* =============================
+       確認使用者公司名稱並建立公司
+       ============================= */
+    function confirmUserCompany() {
+      const userCompanyInput = document.getElementById("userCompanyName");
+      const msgEl = document.getElementById("msg");
+      const t = I18N[getLang()] || I18N.en;
+
+      if (!userCompanyInput || !currentUsername) return;
+
+      const companyName = userCompanyInput.value.trim();
+      if (!companyName) {
+        msgEl.textContent = t.msgEnterCompany;
+        return;
+      }
+
+      const newCompanyId = generateCompanyId(companyName);
+      const templateId = TEMPLATE_COMPANY_ID;
+
+      console.log(`[confirmUserCompany] Creating company for user: username="${currentUsername}", company="${companyName}", id="${newCompanyId}"`);
+
+      // Check if company already exists in directory
+      const directory = getCompanyDirectory();
+      const existingCompany = directory.find(c => c.companyName === companyName || c.companyId === newCompanyId);
+      
+      let finalCompanyId = newCompanyId;
+      let finalCompanyName = companyName;
+
+      if (!existingCompany) {
+        // Create new company using existing createNewCompany logic
+        // Clone sheet visibility
+        const visibilityKeyTemplate = `miniExcel_sheet_visibility_v1__${templateId}`;
+        const visibilityKeyNew = `miniExcel_sheet_visibility_v1__${finalCompanyId}`;
+        try {
+          const visibilityData = localStorage.getItem(visibilityKeyTemplate);
+          if (visibilityData) {
+            localStorage.setItem(visibilityKeyNew, visibilityData);
+            console.log(`[confirmUserCompany] ✅ Cloned visibility: ${visibilityKeyTemplate} -> ${visibilityKeyNew}`);
+          }
+        } catch (err) {
+          console.error(`[confirmUserCompany] ❌ Failed to clone visibility:`, err);
+        }
+
+        // Clone check visibility per-tab
+        const checkVisibilityKeyTemplate = `check_visibility_per_tab_company_${templateId}`;
+        const checkVisibilityKeyNew = `check_visibility_per_tab_company_${finalCompanyId}`;
+        try {
+          const checkVisibilityData = localStorage.getItem(checkVisibilityKeyTemplate);
+          if (checkVisibilityData) {
+            localStorage.setItem(checkVisibilityKeyNew, checkVisibilityData);
+            console.log(`[confirmUserCompany] ✅ Cloned check visibility: ${checkVisibilityKeyTemplate} -> ${checkVisibilityKeyNew}`);
+          }
+        } catch (err) {
+          console.error(`[confirmUserCompany] ❌ Failed to clone check visibility:`, err);
+        }
+
+        // Clone model workspace
+        const modelKeyTemplate = `miniExcel_autosave_model_v4__${templateId}`;
+        const modelKeyNew = `miniExcel_autosave_model_v4__${finalCompanyId}`;
+        try {
+          const modelData = localStorage.getItem(modelKeyTemplate);
+          if (modelData) {
+            const parsed = JSON.parse(modelData);
+            const cloned = {};
+            for (const sheetKey in parsed) {
+              const sheet = parsed[sheetKey];
+              cloned[sheetKey] = {
+                headers: Array.isArray(sheet.headers) ? [...sheet.headers] : [],
+                cols: sheet.cols || 0,
+                rows: sheet.rows || 0,
+                meta: sheet.meta ? JSON.parse(JSON.stringify(sheet.meta)) : {},
+                data: Array(sheet.rows || 0).fill(null).map(() => Array(sheet.cols || 0).fill(""))
+              };
+            }
+            localStorage.setItem(modelKeyNew, JSON.stringify(cloned));
+            console.log(`[confirmUserCompany] ✅ Cloned model workspace: ${modelKeyTemplate} -> ${modelKeyNew} (cleared data)`);
+          }
+        } catch (err) {
+          console.error(`[confirmUserCompany] ❌ Failed to clone model workspace:`, err);
+        }
+
+        // Clone period workspaces
+        try {
+          const periodListKeyTemplate = `miniExcel_period_list_v1__${templateId}`;
+          const periodListKeyNew = `miniExcel_period_list_v1__${finalCompanyId}`;
+          const periodListData = localStorage.getItem(periodListKeyTemplate);
+          let periods = [];
+          if (periodListData) {
+            periods = JSON.parse(periodListData);
+            localStorage.setItem(periodListKeyNew, periodListData);
+            console.log(`[confirmUserCompany] ✅ Cloned period list: ${periodListKeyTemplate} -> ${periodListKeyNew}`);
+          }
+
+          periods.forEach(period => {
+            const periodKeyTemplate = `miniExcel_autosave_period_v4__${templateId}__${period}`;
+            const periodKeyNew = `miniExcel_autosave_period_v4__${finalCompanyId}__${period}`;
+            try {
+              const periodData = localStorage.getItem(periodKeyTemplate);
+              if (periodData) {
+                const parsed = JSON.parse(periodData);
+                const cloned = {};
+                for (const sheetKey in parsed) {
+                  const sheet = parsed[sheetKey];
+                  cloned[sheetKey] = {
+                    headers: Array.isArray(sheet.headers) ? [...sheet.headers] : [],
+                    cols: sheet.cols || 0,
+                    rows: sheet.rows || 0,
+                    meta: sheet.meta ? JSON.parse(JSON.stringify(sheet.meta)) : {},
+                    data: Array(sheet.rows || 0).fill(null).map(() => Array(sheet.cols || 0).fill(""))
+                  };
+                }
+                localStorage.setItem(periodKeyNew, JSON.stringify(cloned));
+                console.log(`[confirmUserCompany] ✅ Cloned period workspace: ${periodKeyTemplate} -> ${periodKeyNew} (cleared data)`);
+              }
+            } catch (err) {
+              console.error(`[confirmUserCompany] ❌ Failed to clone period workspace ${period}:`, err);
+            }
+          });
+        } catch (err) {
+          console.error(`[confirmUserCompany] ❌ Failed to clone period workspaces:`, err);
+        }
+
+        // Add to directory
+        directory.push({ companyName: finalCompanyName, companyId: finalCompanyId });
+        saveCompanyDirectory(directory);
+        console.log(`[confirmUserCompany] ✅ Added to directory: ${finalCompanyName} (${finalCompanyId})`);
+      } else {
+        // Use existing company
+        finalCompanyId = existingCompany.companyId;
+        finalCompanyName = existingCompany.companyName;
+        console.log(`[confirmUserCompany] ✅ Using existing company: ${finalCompanyName} (${finalCompanyId})`);
+      }
+
+      // Save user→company binding
+      if (saveUserCompany(currentUsername, finalCompanyId, finalCompanyName)) {
+        console.log(`[confirmUserCompany] ✅ Saved binding: ${currentUsername} -> ${finalCompanyName} (${finalCompanyId})`);
+      }
+
+      // Redirect to app.html
+      sessionStorage.setItem("loggedIn", "yes");
+      sessionStorage.setItem("role", "user");
+      sessionStorage.setItem("companyId", finalCompanyId);
+      sessionStorage.setItem("companyName", finalCompanyName);
+      window.location.href = "./app.html";
+    }
+
+    /* =============================
        回到上一頁（回到輸入帳密狀態）
        ============================= */
     function goBack() {
       const companyRow = document.getElementById("companyRow");
       const companySelect = document.getElementById("company");
+      const userCompanyRow = document.getElementById("userCompanyRow");
       const loginBtn = document.getElementById("loginBtn");
       const backBtn = document.getElementById("backBtn");
       const msgEl = document.getElementById("msg");
+      const usernameInput = document.getElementById("username");
+      const passwordInput = document.getElementById("password");
       const t = I18N[getLang()] || I18N.en;
 
       isAdminVerified = false;
+      isUserVerified = false;
+      currentUsername = "";
 
       companyRow.style.display = "none";
       companySelect.disabled = true;
       companySelect.value = "";
+      userCompanyRow.style.display = "none";
       
       // Hide create company button
       const createBtn = document.getElementById("createCompanyBtn");
       if (createBtn) createBtn.style.display = "none";
 
+      usernameInput.disabled = false;
+      passwordInput.disabled = false;
+
+      loginBtn.style.display = "block";
       loginBtn.textContent = t.btnNext;
       backBtn.style.display = "none";
       msgEl.textContent = "";
