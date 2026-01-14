@@ -77,7 +77,7 @@ window.DEFS.MODEL_DEF_MAP= {
   ac: {
     title:"Activity Center",
     headers:["Business Unit","Activity Center Code 1","Description 1","Activity Center Code 2",
-      "Description 2","Allocation","ABC-Implemented","Sales Revenue"], cols:9
+      "Description 2","Allocation","ABC-Implemented","Sales Revenue"], cols:8
   },
 
   nc:      { title:"Normal Capacity", headers:["Activity Code","Activity Name","Description"], cols:3 },
