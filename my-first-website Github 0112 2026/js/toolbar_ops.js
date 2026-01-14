@@ -358,7 +358,7 @@ window._syncDelColBtnVisibility = _syncDelColBtnVisibility;
 
       s.cols += 1;
       if (!Array.isArray(s.headers)) s.headers = [];
-      while (s.headers.length < s.cols) s.headers.push("");
+      while (s.headers.length < s.cols) s.headers.push(`Col ${s.headers.length + 1}`);
 
       ensureHeadersForActiveSheet();
       render();
