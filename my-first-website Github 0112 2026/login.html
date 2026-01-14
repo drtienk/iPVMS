@@ -152,11 +152,42 @@
     /* =============================
        帳號資料（前端假資料）
        ============================= */
-      const USER_ACCOUNTS = {
+      // Seed accounts (hardcoded defaults)
+      const SEED_USER_ACCOUNTS = {
         admin: { password: "admin", role: "admin" },
         user1: { password: "user1", role: "user" },
         user2: { password: "user2", role: "user" }
       };
+
+      // User accounts (merged from seed + stored)
+      let USER_ACCOUNTS = { ...SEED_USER_ACCOUNTS };
+
+      // Storage key for persisted accounts
+      const USER_ACCOUNTS_STORE_KEY = "miniExcel_user_accounts_v1";
+
+      /* =============================
+         User Accounts Persistence Helpers
+         ============================= */
+      function loadUserAccounts() {
+        try {
+          const raw = localStorage.getItem(USER_ACCOUNTS_STORE_KEY);
+          if (!raw) return {};
+          const parsed = JSON.parse(raw);
+          return typeof parsed === "object" && parsed !== null ? parsed : {};
+        } catch {
+          return {};
+        }
+      }
+
+      function saveUserAccounts(accounts) {
+        try {
+          localStorage.setItem(USER_ACCOUNTS_STORE_KEY, JSON.stringify(accounts));
+          return true;
+        } catch (err) {
+          console.error("[login] Failed to save user accounts:", err);
+          return false;
+        }
+      }
 
 
     // Company Directory (persisted in localStorage)
@@ -346,6 +377,10 @@
     // 初始化語言
     window.addEventListener("DOMContentLoaded", () => {
       initVersionBadge();
+      
+      // Load persisted user accounts and merge with seed
+      const storedAccounts = loadUserAccounts();
+      USER_ACCOUNTS = { ...SEED_USER_ACCOUNTS, ...storedAccounts };
       
       const savedLang = getLang();
       langSelect.value = savedLang;
@@ -657,6 +692,9 @@
         password: password,
         role: "user"
       };
+
+      // Save to localStorage
+      saveUserAccounts(USER_ACCOUNTS);
 
       // Clear inputs
       usernameInput.value = "";
