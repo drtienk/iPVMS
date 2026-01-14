@@ -25,15 +25,68 @@ window.DEFS.TABLE_RENDER = window.DEFS.TABLE_RENDER || {};
     const trH = document.createElement("tr");
     trH.appendChild(Object.assign(document.createElement("th"), { textContent:"" }));
 
+    // Calculate defCols
+    const key = window.activeKey || "company";
+    const map = window.MODEL_DEF_MAP || window.DEFS?.MODEL_DEF_MAP || {};
+    const defCols = Number(map?.[key]?.cols) || 1;
+    const activeMode = window.activeMode || "model";
+    const isModelMode = (activeMode === "model");
+    const canEdit = (c) => isModelMode && c >= defCols;
+
     for (let c=0; c<s.cols; c++) {
       const th = document.createElement("th");
       let display = String((s.headers[c] ?? "")).trim();
       if (display === "") display = "Col " + (c+1);
 
-      th.appendChild(makeHeaderInput(display, (v)=>{
-        s.headers[c] = String(v ?? "");
-        safeSave();
-      }));
+      if (canEdit(c)) {
+        // Editable: show span, bind dblclick
+        const span = document.createElement("span");
+        span.textContent = display;
+        span.style.cursor = "pointer";
+        th.appendChild(span);
+
+        let editing = false;
+        th.addEventListener("dblclick", () => {
+          if (editing) return;
+          editing = true;
+
+          th.innerHTML = "";
+          const inp = document.createElement("input");
+          inp.type = "text";
+          inp.className = "th-input";
+          inp.value = (s.headers[c] ?? "") || display;
+          th.appendChild(inp);
+          inp.focus();
+          inp.select();
+
+          const finishEdit = (save) => {
+            if (!editing) return;
+            editing = false;
+            if (save) {
+              s.headers[c] = String(inp.value || "").trim();
+              safeSave();
+            }
+            if (typeof window.render === "function") window.render();
+          };
+
+          inp.addEventListener("blur", () => finishEdit(true));
+          inp.addEventListener("keydown", (e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              finishEdit(true);
+            } else if (e.key === "Escape") {
+              e.preventDefault();
+              finishEdit(false);
+            }
+          });
+        });
+      } else {
+        // Non-editable: just show span
+        const span = document.createElement("span");
+        span.textContent = display;
+        th.appendChild(span);
+      }
+
       trH.appendChild(th);
     }
     gridHead.appendChild(trH);
