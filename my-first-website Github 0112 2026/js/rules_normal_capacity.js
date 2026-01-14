@@ -115,6 +115,7 @@ console.log("✅ [rules_normal_capacity.js] loaded");
 
   // ✅ 主檢查函數
   function checkNormalCapacity(){
+    console.log("✅ [checkNormalCapacity] START, activeMode:", typeof activeMode !== "undefined" ? activeMode : "undefined", "activeKey:", typeof activeKey !== "undefined" ? activeKey : "undefined");
     // 只在 Model 模式檢查
     if (typeof activeMode === "undefined" || activeMode !== TARGET_MODE) {
       return {
@@ -138,7 +139,9 @@ console.log("✅ [rules_normal_capacity.js] loaded");
     }
 
     // 取得 sheet 資料
+    console.log("✅ [checkNormalCapacity] calling activeSheet(), activeSheet type:", typeof activeSheet);
     const sheet = (typeof activeSheet === "function") ? activeSheet() : null;
+    console.log("✅ [checkNormalCapacity] got sheet:", !!sheet, "sheet keys:", sheet ? Object.keys(sheet) : "null");
     if (!sheet) {
       return {
         ok: false,
@@ -235,13 +238,15 @@ console.log("✅ [rules_normal_capacity.js] loaded");
       // ✅ 檢查通過：設定已檢查狀態
       setCheckedStatus(true);
       
-      return {
+      const result = {
         ok: true,
         type: "ok",
         msg: (typeof lang !== "undefined" && lang === "en")
           ? "✅ Check passed. Row 1: Activity Code and Activity Name are both filled."
           : "✅ 檢查通過。第 1 列：Activity Code 和 Activity Name 都已填寫。"
       };
+      console.log("✅ [checkNormalCapacity] END (PASS), returning:", result);
+      return result;
     }
 
     // 有錯誤：清除已檢查狀態並顯示錯誤
@@ -253,7 +258,7 @@ console.log("✅ [rules_normal_capacity.js] loaded");
       ? `⚠️ Found ${errors.length} error(s) in Row 1:\n${errorLines.join("\n")}`
       : `⚠️ 第 1 列發現 ${errors.length} 個錯誤：\n${errorLines.join("\n")}`;
 
-    return {
+    const result = {
       ok: false,
       type: "err",
       msg: errorMsg,
@@ -264,6 +269,8 @@ console.log("✅ [rules_normal_capacity.js] loaded");
         c: errors[0].col
       }
     };
+    console.log("✅ [checkNormalCapacity] END (FAIL), returning:", result);
+    return result;
   }
 
   // ✅ 監聽資料變更事件，自動清除已檢查狀態

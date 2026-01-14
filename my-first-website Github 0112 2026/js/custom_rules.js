@@ -1508,6 +1508,8 @@ function runChecksForActiveSheet(){
   // ✅ 取得 activeKey（確保是字串且已 trim）
   const key = (window.activeKey || "").trim();
   
+  console.log("✅ [CHECK] dispatch", { sheetKey: key, ruleKey: key });
+  
   // ✅ 從註冊表查找規則函數
   let ruleFn = REG[key];
   
@@ -1535,7 +1537,9 @@ function runChecksForActiveSheet(){
   }
 
   // ✅ 執行規則函數
+  console.log("✅ [CHECK] call rule", typeof ruleFn);
   const res = ruleFn();
+  console.log("✅ [CHECK] result", res);
 
   // ✅ 處理檢查結果並顯示 UI
   if (!res || res.ok) {
@@ -1622,6 +1626,7 @@ window.runChecksForActiveSheet = runChecksForActiveSheet;
     
     // ✅ 綁定 Check 按鈕：所有分頁統一使用 runChecksForActiveSheet() 標準流程
     onFn("checkBtn", "click", function(){
+      console.log("✅ [CHECK] click");
       runChecksForActiveSheet();
     });
     return true;

@@ -88,8 +88,11 @@ console.log('✅ [08] app_sheets_core loaded');
 
   // ✅ activeSheet reads window.activeKey
   function activeSheet() {
+    console.log("✅ [activeSheet] called, activeKey:", window.activeKey, "sheets keys:", Object.keys(sheets || {}));
     var k = window.activeKey || "company";
-    return sheets[k];
+    var result = sheets[k];
+    console.log("✅ [activeSheet] returning sheet for key:", k, "sheet exists:", !!result);
+    return result;
   }
   window.activeSheet = activeSheet;
 
