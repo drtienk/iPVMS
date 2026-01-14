@@ -443,6 +443,7 @@ window._syncDelColBtnVisibility = _syncDelColBtnVisibility;
       const a = document.createElement("a");
       a.href = url;
       a.download = filename;
+      console.log("✅ [CSV DEBUG]", { company, modeTag, periodTag, sheetTag, filename, keyNow, modeNow, sheetTitle: s?.title, defTitle: mapNow?.[keyNow]?.title });
       a.click();
       URL.revokeObjectURL(url);
     });
