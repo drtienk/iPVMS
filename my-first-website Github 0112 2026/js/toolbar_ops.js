@@ -432,7 +432,24 @@ window._syncDelColBtnVisibility = _syncDelColBtnVisibility;
       const modeNow = _getActiveMode();
       const keyNow  = _getActiveKey();
       const mapNow  = _getDefMapByMode(modeNow);
-      const sheetTag = String(mapNow?.[keyNow]?.title || s?.title || keyNow || "Sheet").trim();
+      const KEY_TO_NAME = {
+        company: "Company",
+        bu: "Business Unit",
+        cr: "Company Resource",
+        ac: "Activity Center",
+        nc: "Normal Capacity",
+        act: "Activity",
+        daf: "DAF",
+        mach: "Machine",
+        mat: "Material",
+        pp: "Product/Process",
+        prod: "Product",
+        cust: "Customer",
+        sd: "Sales/Distribution"
+      };
+      const sheetTag = String(
+        KEY_TO_NAME[keyNow] || mapNow?.[keyNow]?.title || s?.title || keyNow || "Sheet"
+      ).trim();
       let filename = `${company}_${modeTag}${periodTag}_${sheetTag}.csv`;
       
       // Sanitize filename: replace invalid characters with underscore
