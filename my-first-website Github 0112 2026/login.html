@@ -153,14 +153,11 @@
        帳號資料（前端假資料）
        ============================= */
       // Seed accounts (hardcoded defaults)
-      const SEED_USER_ACCOUNTS = {
+      const USER_ACCOUNTS_SEED = {
         admin: { password: "admin", role: "admin" },
         user1: { password: "user1", role: "user" },
         user2: { password: "user2", role: "user" }
       };
-
-      // User accounts (merged from seed + stored)
-      let USER_ACCOUNTS = { ...SEED_USER_ACCOUNTS };
 
       // Storage key for persisted accounts
       const USER_ACCOUNTS_STORE_KEY = "miniExcel_user_accounts_v1";
@@ -171,22 +168,36 @@
       function loadUserAccounts() {
         try {
           const raw = localStorage.getItem(USER_ACCOUNTS_STORE_KEY);
-          if (!raw) return {};
+          if (!raw) return null;
           const parsed = JSON.parse(raw);
-          return typeof parsed === "object" && parsed !== null ? parsed : {};
+          return typeof parsed === "object" && parsed !== null ? parsed : null;
         } catch {
-          return {};
+          return null;
         }
       }
 
       function saveUserAccounts(accounts) {
         try {
+          // Ensure admin account always exists
+          if (!accounts.admin) {
+            accounts.admin = USER_ACCOUNTS_SEED.admin;
+          }
           localStorage.setItem(USER_ACCOUNTS_STORE_KEY, JSON.stringify(accounts));
           return true;
         } catch (err) {
           console.error("[login] Failed to save user accounts:", err);
           return false;
         }
+      }
+
+      function getUserAccounts() {
+        const stored = loadUserAccounts();
+        if (stored === null) {
+          // Storage empty, return seed only
+          return { ...USER_ACCOUNTS_SEED };
+        }
+        // Storage exists, return stored (admin is protected in saveUserAccounts)
+        return { ...stored };
       }
 
 
@@ -377,10 +388,6 @@
     // 初始化語言
     window.addEventListener("DOMContentLoaded", () => {
       initVersionBadge();
-      
-      // Load persisted user accounts and merge with seed
-      const storedAccounts = loadUserAccounts();
-      USER_ACCOUNTS = { ...SEED_USER_ACCOUNTS, ...storedAccounts };
       
       const savedLang = getLang();
       langSelect.value = savedLang;
@@ -620,7 +627,7 @@
       const headerRow = document.createElement("tr");
       headerRow.style.borderBottom = "2px solid #d1d5db";
       headerRow.style.backgroundColor = "#f3f4f6";
-      ["Username", "Role", "Company Name"].forEach(text => {
+      ["Username", "Role", "Company Name", "Actions"].forEach(text => {
         const th = document.createElement("th");
         th.textContent = text;
         th.style.padding = "8px";
@@ -630,10 +637,12 @@
       table.appendChild(headerRow);
 
       // Data rows
-      Object.keys(USER_ACCOUNTS).forEach(username => {
-        const account = USER_ACCOUNTS[username];
+      const accounts = getUserAccounts();
+      Object.keys(accounts).forEach(username => {
+        const account = accounts[username];
         const userCompany = getUserCompany(username);
         const companyName = userCompany ? userCompany.companyName : "Not assigned";
+        const isAdmin = account.role === "admin";
 
         const row = document.createElement("tr");
         row.style.borderBottom = "1px solid #e5e7eb";
@@ -653,6 +662,23 @@
         companyCell.style.padding = "8px";
         companyCell.style.color = companyName === "Not assigned" ? "#6b7280" : "#111827";
         row.appendChild(companyCell);
+
+        const actionsCell = document.createElement("td");
+        actionsCell.style.padding = "8px";
+        if (!isAdmin) {
+          const deleteBtn = document.createElement("button");
+          deleteBtn.textContent = "Delete";
+          deleteBtn.style.padding = "4px 8px";
+          deleteBtn.style.background = "#ef4444";
+          deleteBtn.style.color = "#fff";
+          deleteBtn.style.border = "0";
+          deleteBtn.style.borderRadius = "4px";
+          deleteBtn.style.cursor = "pointer";
+          deleteBtn.style.fontSize = "12px";
+          deleteBtn.onclick = () => deleteUser(username);
+          actionsCell.appendChild(deleteBtn);
+        }
+        row.appendChild(actionsCell);
 
         table.appendChild(row);
       });
@@ -682,19 +708,20 @@
       }
 
       // Check duplicate
-      if (USER_ACCOUNTS[username]) {
+      const accounts = getUserAccounts();
+      if (accounts[username]) {
         msgEl.textContent = "Username already exists";
         return;
       }
 
-      // Add to USER_ACCOUNTS
-      USER_ACCOUNTS[username] = {
+      // Add to accounts
+      accounts[username] = {
         password: password,
         role: "user"
       };
 
       // Save to localStorage
-      saveUserAccounts(USER_ACCOUNTS);
+      saveUserAccounts(accounts);
 
       // Clear inputs
       usernameInput.value = "";
@@ -705,6 +732,39 @@
 
       msgEl.textContent = `User "${username}" added successfully`;
       msgEl.style.color = "#10b981";
+    }
+
+    /* =============================
+       刪除使用者
+       ============================= */
+    function deleteUser(username) {
+      if (!confirm("Delete user?")) return;
+
+      const accounts = getUserAccounts();
+      
+      // Prevent deleting admin
+      if (accounts[username] && accounts[username].role === "admin") {
+        alert("Cannot delete admin account");
+        return;
+      }
+
+      // Remove from accounts
+      delete accounts[username];
+      saveUserAccounts(accounts);
+
+      // Remove from user company binding
+      try {
+        const map = loadUserCompanyMap();
+        if (map[username]) {
+          delete map[username];
+          localStorage.setItem(USER_COMPANY_MAP_KEY, JSON.stringify(map));
+        }
+      } catch (err) {
+        console.error("[deleteUser] Failed to remove company binding:", err);
+      }
+
+      // Re-render user list
+      renderUserList();
     }
 
     /* =============================
@@ -759,7 +819,8 @@
 
       msgEl.textContent = "";
 
-      const account = USER_ACCOUNTS[u];
+      const accounts = getUserAccounts();
+      const account = accounts[u];
       if (!account || account.password !== p) {
         msgEl.textContent = t.msgBadCred;
         return;
