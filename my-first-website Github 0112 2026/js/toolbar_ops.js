@@ -429,7 +429,10 @@ window._syncDelColBtnVisibility = _syncDelColBtnVisibility;
       const company = (documentMeta?.companyName || sessionStorage.getItem("companyName") || "Company").trim();
       const modeTag = (CTX.activeMode === "period") ? "Period" : "Model";
       const periodTag = (CTX.activeMode === "period" && CTX.activePeriod) ? `_${CTX.activePeriod}` : "";
-      const sheetTag = (s.title || "Sheet").trim();
+      const modeNow = _getActiveMode();
+      const keyNow  = _getActiveKey();
+      const mapNow  = _getDefMapByMode(modeNow);
+      const sheetTag = String(mapNow?.[keyNow]?.title || s?.title || keyNow || "Sheet").trim();
       let filename = `${company}_${modeTag}${periodTag}_${sheetTag}.csv`;
       
       // Sanitize filename: replace invalid characters with underscore
