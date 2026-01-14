@@ -18,6 +18,8 @@ console.log("✅ [check_visibility_ui] loaded");
 
 (function installCheckVisibilityUI(){
   // Only run on login page
+  const path = (window.location?.pathname || "").toLowerCase();
+  if (!path.endsWith("login.html") && !path.includes("/login.html")) return;
   if (!document.getElementById("companyRow")) return;
   if (window.__CHECK_VISIBILITY_UI_INSTALLED__) return;
   window.__CHECK_VISIBILITY_UI_INSTALLED__ = true;

@@ -360,19 +360,26 @@ SAFE TO REPLACE WHOLE BLOCK
   <div id="checkButtonAdminModal" class="modal">
     <div class="modal-card">
       <div class="modal-head">
-        <div style="font-weight:800;">🔧 Check Button 可見性設定（只影響目前公司）</div>
-        <button type="button" id="checkButtonAdminClose" class="btn-gray">關閉</button>
+        <div id="checkButtonAdminTitle" style="font-weight:800;">🔧 Check Button Visibility (company-scoped)</div>
+        <button type="button" id="checkButtonAdminClose" class="btn-gray">Close</button>
       </div>
 
-      <div class="modal-body">
-        <div style="font-weight:800; margin-bottom:8px;">標籤頁設定</div>
-        <div id="checkButtonAdminList" class="admin-list"></div>
+      <div class="admin-cols">
+        <div class="admin-col">
+          <div id="checkButtonAdminModelTitle" style="font-weight:800; margin-bottom:8px;">Model Tabs</div>
+          <div id="checkButtonAdminListModel" class="admin-list"></div>
+        </div>
+
+        <div class="admin-col">
+          <div id="checkButtonAdminPeriodTitle" style="font-weight:800; margin-bottom:8px;">Period Tabs</div>
+          <div id="checkButtonAdminListPeriod" class="admin-list"></div>
+        </div>
       </div>
 
       <div class="modal-foot">
-        <button type="button" id="checkButtonAdminAllOn" class="btn-ok">全部啟用</button>
-        <button type="button" id="checkButtonAdminAllOff" class="btn-gray">全部停用</button>
-        <button type="button" id="checkButtonAdminSave">儲存並套用</button>
+        <button type="button" id="checkButtonAdminAllOn" class="btn-ok">All On</button>
+        <button type="button" id="checkButtonAdminAllOff" class="btn-gray">All Off</button>
+        <button type="button" id="checkButtonAdminSave">Save & Apply</button>
       </div>
     </div>
   </div>

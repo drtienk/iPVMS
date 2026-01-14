@@ -26,8 +26,25 @@ window.DEFS.CHECK_BUTTON_ADMIN_UI = window.DEFS.CHECK_BUTTON_ADMIN_UI || {};
       closeBtnIds: ["checkButtonAdminClose"]
     });
 
+    function applyCheckButtonAdminI18n() {
+      const t = window.t || ((k) => k);
+      const setText = (id, key) => {
+        const el = $(id);
+        if (el) el.textContent = t(key);
+      };
+
+      setText("checkButtonAdminTitle", "check_admin_title");
+      setText("checkButtonAdminClose", "check_admin_close");
+      setText("checkButtonAdminModelTitle", "check_admin_model");
+      setText("checkButtonAdminPeriodTitle", "check_admin_period");
+      setText("checkButtonAdminAllOn", "check_admin_all_on");
+      setText("checkButtonAdminAllOff", "check_admin_all_off");
+      setText("checkButtonAdminSave", "check_admin_save");
+    }
+
     function openCheckButtonAdmin() {
       checkButtonAdminCtl?.open();
+      applyCheckButtonAdminI18n();
       renderCheckButtonAdminList();
     }
     function closeCheckButtonAdmin() {
@@ -46,11 +63,16 @@ window.DEFS.CHECK_BUTTON_ADMIN_UI = window.DEFS.CHECK_BUTTON_ADMIN_UI || {};
       const TAB_CONFIG = window.DEFS?.TABS?.TAB_CONFIG || [];
       const tabLabel = window.DEFS?.TABS?.tabLabel || function(tcfg) { return tcfg.enModel || tcfg.key; };
 
-      const wrap = $("checkButtonAdminList");
-      if (!wrap) return;
-      wrap.innerHTML = "";
+      const wrapModel = $("checkButtonAdminListModel");
+      const wrapPeriod = $("checkButtonAdminListPeriod");
+      if (!wrapModel || !wrapPeriod) return;
 
-      TAB_CONFIG.forEach(tcfg => {
+      wrapModel.innerHTML = "";
+      wrapPeriod.innerHTML = "";
+
+      const checkboxMap = {};
+
+      const addRow = (wrap, labelText, sheetKey) => {
         const row = document.createElement("label");
         row.style.display = "flex";
         row.style.alignItems = "center";
@@ -58,19 +80,51 @@ window.DEFS.CHECK_BUTTON_ADMIN_UI = window.DEFS.CHECK_BUTTON_ADMIN_UI || {};
         row.style.padding = "6px 4px";
         row.style.borderBottom = "1px solid #f3f4f6";
         row.style.cursor = "pointer";
-        
+
         const checkbox = document.createElement("input");
         checkbox.type = "checkbox";
-        checkbox.dataset.sheetKey = tcfg.key;
-        checkbox.checked = perTabMap[tcfg.key] === true;
-        
-        const labelText = document.createElement("span");
-        labelText.style.fontSize = "14px";
-        labelText.textContent = tabLabel(tcfg);
-        
+        checkbox.dataset.sheetKey = sheetKey;
+        checkbox.checked = perTabMap[sheetKey] === true;
+
+        const labelSpan = document.createElement("span");
+        labelSpan.style.fontSize = "14px";
+        labelSpan.textContent = labelText;
+
         row.appendChild(checkbox);
-        row.appendChild(labelText);
+        row.appendChild(labelSpan);
         wrap.appendChild(row);
+
+        checkboxMap[sheetKey] = checkboxMap[sheetKey] || [];
+        checkboxMap[sheetKey].push(checkbox);
+      };
+
+      TAB_CONFIG.forEach(tcfg => {
+        const modelLabel = tabLabel({
+          ...tcfg,
+          // Force tabLabel to use model wording regardless of activeMode
+          zhPeriod: tcfg.zhModel,
+          enPeriod: tcfg.enModel
+        });
+        const periodLabel = tabLabel({
+          ...tcfg,
+          // Force tabLabel to use period wording regardless of activeMode
+          enModel: tcfg.enPeriod,
+          zhModel: tcfg.zhPeriod
+        });
+
+        addRow(wrapModel, modelLabel, tcfg.key);
+        addRow(wrapPeriod, periodLabel, tcfg.key);
+      });
+
+      // Keep paired checkboxes in sync so they represent one setting
+      Object.values(checkboxMap).forEach(list => {
+        list.forEach(chk => {
+          chk.addEventListener("change", () => {
+            list.forEach(other => {
+              if (other !== chk) other.checked = chk.checked;
+            });
+          });
+        });
       });
     }
 
@@ -97,9 +151,13 @@ window.DEFS.CHECK_BUTTON_ADMIN_UI = window.DEFS.CHECK_BUTTON_ADMIN_UI || {};
 
       const companyId = store.getCompanyId();
       const checkboxes = document.querySelectorAll('#checkButtonAdminModal input[type="checkbox"][data-sheet-key]');
+      const seen = new Set();
 
       checkboxes.forEach(chk => {
         const sheetKey = chk.getAttribute("data-sheet-key");
+        if (!sheetKey || seen.has(sheetKey)) return;
+        seen.add(sheetKey);
+
         const enabled = !!chk.checked;
         store.setPerTabUserCheck(companyId, sheetKey, enabled);
       });
