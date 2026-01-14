@@ -176,21 +176,15 @@ window.DEFS.CHECK_VISIBILITY = window.DEFS.CHECK_VISIBILITY || {};
    */
   function canUserSeeCheckOnTab(companyId, sheetKey, isAdmin) {
     // ✅ REMOVED: Admin bypass - admin and non-admin now have identical visibility
-    // Both roles see Check button only if per-tab setting is enabled
+    // ✅ REMOVED: Global toggle check - now only uses per-tab settings
+    // Both roles see Check button only if per-tab setting is explicitly enabled
     
     const id = companyId || getCompanyId();
     const sheet = String(sheetKey || "").trim();
     
     if (!sheet) return false;
     
-    // Check global toggle first
-    const globalEnabled = getGlobalUserCheckEnabled(id);
-    if (!globalEnabled) {
-      // Global OFF: no one sees Check anywhere
-      return false;
-    }
-    
-    // Global ON: check per-tab setting
+    // Directly check per-tab setting (no global toggle)
     const perTabMap = getPerTabUserCheckMap(id);
     // Only return true if explicitly enabled (default: false)
     return perTabMap[sheet] === true;
