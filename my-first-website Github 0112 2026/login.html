@@ -120,6 +120,7 @@
         <option value="">-- Select a company --</option>
       </select>
       <button id="createCompanyBtn" type="button" style="display:none; margin-top:8px; width:100%; padding:8px; background:#10b981; color:#fff; border:0; border-radius:8px; cursor:pointer; font-weight:600;">Create New Company</button>
+      <button id="deleteCompanyBtn" type="button" style="display:none; margin-top:8px; width:100%; padding:8px; background:#ef4444; color:#fff; border:0; border-radius:8px; cursor:pointer; font-weight:600;">Delete Company</button>
     </div>
 
     <!-- User Company Name Input: 預設隱藏 -->
@@ -416,6 +417,12 @@
         addUserBtn.addEventListener("click", addNewUser);
       }
 
+      // Bind delete company button
+      const deleteCompanyBtn = document.getElementById("deleteCompanyBtn");
+      if (deleteCompanyBtn) {
+        deleteCompanyBtn.addEventListener("click", deleteCompany);
+      }
+
       // 焦點
       document.getElementById("username").focus();
 
@@ -577,6 +584,13 @@
       const createBtn = document.getElementById("createCompanyBtn");
       if (createBtn) createBtn.style.display = "block";
 
+      // Show delete company button (admin step-2 only)
+      const deleteBtn = document.getElementById("deleteCompanyBtn");
+      if (deleteBtn) {
+        deleteBtn.style.display = "block";
+        updateDeleteCompanyButtonState();
+      }
+
       // 清掉舊選項（保留第 0 個 placeholder）
       while (companySelect.options.length > 1) companySelect.remove(1);
 
@@ -606,6 +620,137 @@
         userManagement.style.display = "block";
         renderUserList();
       }
+
+      // Bind company select change to update delete button state
+      companySelect.addEventListener("change", updateDeleteCompanyButtonState);
+    }
+
+    /* =============================
+       更新刪除公司按鈕狀態
+       ============================= */
+    function updateDeleteCompanyButtonState() {
+      const companySelect = document.getElementById("company");
+      const deleteBtn = document.getElementById("deleteCompanyBtn");
+      
+      if (!companySelect || !deleteBtn) return;
+
+      const selectedCompanyName = companySelect.value;
+      if (!selectedCompanyName) {
+        deleteBtn.disabled = true;
+        return;
+      }
+
+      const selectedCompanyId = COMPANY_ID_MAP[selectedCompanyName];
+      if (selectedCompanyId === TEMPLATE_COMPANY_ID) {
+        deleteBtn.disabled = true;
+      } else {
+        deleteBtn.disabled = false;
+      }
+    }
+
+    /* =============================
+       刪除公司（完整清理）
+       ============================= */
+    function deleteCompany() {
+      const companySelect = document.getElementById("company");
+      if (!companySelect || !companySelect.value) return;
+
+      const companyName = companySelect.value;
+      const companyId = COMPANY_ID_MAP[companyName];
+
+      // Safety checks
+      if (!companyId || companyId === TEMPLATE_COMPANY_ID) {
+        alert("Cannot delete template company or invalid selection");
+        return;
+      }
+
+      // Confirm deletion
+      if (!confirm("Delete this company and ALL its data?")) {
+        return;
+      }
+
+      console.log(`[deleteCompany] Starting deletion: name="${companyName}", id="${companyId}"`);
+
+      // A) Remove from company directory
+      const directory = getCompanyDirectory();
+      const filtered = directory.filter(c => c.companyId !== companyId);
+      if (saveCompanyDirectory(filtered)) {
+        console.log(`[deleteCompany] ✅ Removed from directory: ${companyName} (${companyId})`);
+      } else {
+        console.error(`[deleteCompany] ❌ Failed to remove from directory`);
+      }
+
+      // B) Delete all localStorage keys for this company
+      const keysToDelete = [];
+      try {
+        for (let i = 0; i < localStorage.length; i++) {
+          const key = localStorage.key(i);
+          if (!key) continue;
+
+          // Check all prefixes
+          if (key === `miniExcel_sheet_visibility_v1__${companyId}` ||
+              key === `check_visibility_per_tab_company_${companyId}` ||
+              key === `miniExcel_period_list_v1__${companyId}` ||
+              (key.startsWith(`miniExcel_autosave_model_`) && key.endsWith(`__${companyId}`)) ||
+              (key.startsWith(`miniExcel_autosave_period_`) && key.includes(`__${companyId}__`))) {
+            keysToDelete.push(key);
+          }
+        }
+
+        keysToDelete.forEach(key => {
+          try {
+            localStorage.removeItem(key);
+            console.log(`[deleteCompany] ✅ Deleted key: ${key}`);
+          } catch (err) {
+            console.error(`[deleteCompany] ❌ Failed to delete key ${key}:`, err);
+          }
+        });
+
+        console.log(`[deleteCompany] ✅ Deleted ${keysToDelete.length} localStorage keys`);
+      } catch (err) {
+        console.error(`[deleteCompany] ❌ Failed to scan/delete localStorage keys:`, err);
+      }
+
+      // C) Clean up user → company bindings
+      try {
+        const map = loadUserCompanyMap();
+        let removedCount = 0;
+        Object.keys(map).forEach(username => {
+          if (map[username] && map[username].companyId === companyId) {
+            delete map[username];
+            removedCount++;
+          }
+        });
+        if (removedCount > 0) {
+          localStorage.setItem(USER_COMPANY_MAP_KEY, JSON.stringify(map));
+          console.log(`[deleteCompany] ✅ Removed ${removedCount} user-company bindings`);
+        } else {
+          console.log(`[deleteCompany] ℹ️ No user-company bindings found for this company`);
+        }
+      } catch (err) {
+        console.error(`[deleteCompany] ❌ Failed to clean user-company bindings:`, err);
+      }
+
+      // Check if admin was logged into this company
+      try {
+        const loggedCompanyId = sessionStorage.getItem("companyId");
+        if (loggedCompanyId === companyId) {
+          // Force admin back to login step
+          sessionStorage.clear();
+          alert("Company deleted. You have been logged out.");
+          window.location.reload();
+          return;
+        }
+      } catch (err) {
+        console.error(`[deleteCompany] ❌ Failed to check session:`, err);
+      }
+
+      // Refresh UI
+      companySelect.value = "";
+      showCompanyDropdown();
+      renderUserList();
+
+      console.log(`[deleteCompany] ✅ Deletion complete: ${companyName} (${companyId})`);
     }
 
     /* =============================
@@ -987,6 +1132,10 @@ return;
       // Hide create company button
       const createBtn = document.getElementById("createCompanyBtn");
       if (createBtn) createBtn.style.display = "none";
+
+      // Hide delete company button
+      const deleteBtn = document.getElementById("deleteCompanyBtn");
+      if (deleteBtn) deleteBtn.style.display = "none";
 
       // Hide user management
       const userManagement = document.getElementById("adminUserManagement");
