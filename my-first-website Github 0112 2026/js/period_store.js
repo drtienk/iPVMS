@@ -90,6 +90,68 @@ window.DEFS.PERIOD = window.DEFS.PERIOD || {};
   }
 
   // ---------------------------------------------------------
+  // Delete period
+  // ---------------------------------------------------------
+  function deletePeriod(periodStr) {
+    periodStr = String(periodStr || "").trim();
+    if (!periodStr) return false;
+
+    let removedCount = 0;
+    try {
+      const company = companyScopeKey();
+
+      // 1) Remove from period list
+      const list = loadPeriodList();
+      const filtered = list.filter(p => p !== periodStr);
+      if (filtered.length !== list.length) {
+        savePeriodList(filtered);
+        removedCount++;
+      }
+
+      // 2) Delete all localStorage keys for this period
+      const keysToDelete = [];
+      try {
+        for (let i = 0; i < localStorage.length; i++) {
+          const key = localStorage.key(i);
+          if (!key) continue;
+
+          // Check if key matches pattern: miniExcel_autosave_period_*__${company}__${periodStr}
+          if (key.startsWith("miniExcel_autosave_period_") && key.includes(`__${company}__${periodStr}`)) {
+            keysToDelete.push(key);
+          }
+        }
+
+        keysToDelete.forEach(key => {
+          try {
+            localStorage.removeItem(key);
+            removedCount++;
+          } catch (err) {
+            console.error(`[deletePeriod] Failed to delete key ${key}:`, err);
+          }
+        });
+      } catch (err) {
+        console.error(`[deletePeriod] Failed to scan/delete localStorage keys:`, err);
+      }
+
+      // 3) Clear activePeriod if it matches
+      try {
+        const active = sessionStorage.getItem("activePeriod");
+        if (active === periodStr) {
+          setActivePeriod("");
+        }
+      } catch (err) {
+        console.error(`[deletePeriod] Failed to clear activePeriod:`, err);
+      }
+
+      console.log("✅ deletePeriod done", { company, period: periodStr, removed: removedCount });
+      return true;
+    } catch (err) {
+      console.error(`[deletePeriod] Error:`, err);
+      return false;
+    }
+  }
+
+  // ---------------------------------------------------------
   // Exports
   // ---------------------------------------------------------
   window.DEFS.PERIOD.companyScopeKey = companyScopeKey;
@@ -98,6 +160,7 @@ window.DEFS.PERIOD = window.DEFS.PERIOD || {};
   window.DEFS.PERIOD.loadPeriodList = loadPeriodList;
   window.DEFS.PERIOD.savePeriodList = savePeriodList;
   window.DEFS.PERIOD.setActivePeriod = setActivePeriod;
+  window.DEFS.PERIOD.deletePeriod = deletePeriod;
 
   // ---------------------------------------------------------
   // Backward-compatible global aliases (only set if missing)
@@ -107,5 +170,6 @@ window.DEFS.PERIOD = window.DEFS.PERIOD || {};
   if (!window.loadPeriodList) window.loadPeriodList = loadPeriodList;
   if (!window.savePeriodList) window.savePeriodList = savePeriodList;
   if (!window.setActivePeriod) window.setActivePeriod = setActivePeriod;
+  if (!window.deletePeriod) window.deletePeriod = deletePeriod;
 
 })();

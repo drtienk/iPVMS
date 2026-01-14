@@ -328,9 +328,31 @@ window.DEFS.SELECTION_EVENTS = window.DEFS.SELECTION_EVENTS || {};
       if (!EDIT.active) return;
       const after = String(EDIT.td?.textContent ?? "");
       const before = String(EDIT.before ?? "");
+      const r = EDIT.r;
+      const c = EDIT.c;
+      
       if (before !== after){
-        pushHist({ top: EDIT.r, left: EDIT.c, rows:1, cols:1, beforeTSV: before, afterTSV: after });
+        pushHist({ top: r, left: c, rows:1, cols:1, beforeTSV: before, afterTSV: after });
+        
+        // ✅ BUG FIX #1: Write edited value into sheet model
+        try {
+          const s = (typeof window.activeSheet === "function") ? window.activeSheet() : null;
+          if (s && s.data && Number.isFinite(r) && Number.isFinite(c)) {
+            if (!s.data[r]) s.data[r] = [];
+            s.data[r][c] = after;
+            
+            // Save to localStorage if available
+            if (typeof window.saveToLocalByMode === "function" && window.activeMode) {
+              window.saveToLocalByMode(window.activeMode);
+            }
+            
+            console.log("[EDIT COMMIT->MODEL]", {r, c, before, after});
+          }
+        } catch (err) {
+          console.error("[commitEditSession] Failed to write to model:", err);
+        }
       }
+      
       EDIT.active = false;
       EDIT.r = EDIT.c = null;
       EDIT.td = null;
@@ -556,6 +578,29 @@ window.DEFS.SELECTION_EVENTS = window.DEFS.SELECTION_EVENTS || {};
 
       const key = `${td.dataset.r},${td.dataset.c}`;
       if (window.__CELL_EDIT_MODE && window.__EDIT_CELL_KEY === key) return;
+
+      // ✅ BUG FIX #2: Right-click inside multi-cell selection should not collapse
+      const isRightClick = (e.button === 2);
+      if (isRightClick) {
+        const r = Number(td.dataset.r);
+        const c = Number(td.dataset.c);
+        if (Number.isFinite(r) && Number.isFinite(c)) {
+          const hasRange = !selectionIsSingleCell();
+          const rect = selectionRect();
+          let insideSelection = false;
+          
+          if (hasRange && rect) {
+            insideSelection = inRect(r, c, rect.top, rect.left, rect.bottom, rect.right);
+          }
+          
+          console.log("[RIGHT CLICK]", {insideSelection, hasRange});
+          
+          if (hasRange && insideSelection) {
+            // Right-click inside existing selection: allow context menu, don't collapse
+            return;
+          }
+        }
+      }
 
       exitEdit();
 

@@ -48,6 +48,21 @@ window.DEFS.PERIOD_UI = window.DEFS.PERIOD_UI || {};
       }
 
       updateCurrentPeriodTag();
+
+      // Ensure deletePeriodBtn exists
+      const newPeriodBtn = $("newPeriodBtn");
+      let deletePeriodBtn = $("deletePeriodBtn");
+      if (!deletePeriodBtn && newPeriodBtn) {
+        deletePeriodBtn = document.createElement("button");
+        deletePeriodBtn.id = "deletePeriodBtn";
+        deletePeriodBtn.type = "button";
+        deletePeriodBtn.textContent = (lang === "en") ? "Delete Period" : "刪除 Period";
+        deletePeriodBtn.className = "btn-danger";
+        newPeriodBtn.insertAdjacentElement("afterend", deletePeriodBtn);
+      }
+      if (deletePeriodBtn) {
+        deletePeriodBtn.textContent = (lang === "en") ? "Delete Period" : "刪除 Period";
+      }
     }
 
     const periodModalCtl = Modal.bind("periodModal", {
@@ -108,6 +123,38 @@ window.DEFS.PERIOD_UI = window.DEFS.PERIOD_UI || {};
       ensureActiveKeyVisible();
       refreshUI();
       setActive(activeKey);
+    }
+
+    // Bind delete period button
+    if (!window.__DELETE_PERIOD_BINDED__) {
+      window.__DELETE_PERIOD_BINDED__ = true;
+      setTimeout(() => {
+        const deleteBtn = $("deletePeriodBtn");
+        if (deleteBtn) {
+          deleteBtn.addEventListener("click", () => {
+            const target = $("periodSelect")?.value;
+            if (!target || target === "") {
+              alert((lang === "en") ? "No period selected to delete" : "沒有可刪除的 Period");
+              return;
+            }
+
+            if (!confirm(`Delete ${target}? This will remove ALL data in this period.`)) {
+              return;
+            }
+
+            window.DEFS?.PERIOD?.deletePeriod?.(target);
+            renderPeriodBar();
+
+            if (activeMode === "period") {
+              for (const k in sheets) sheets[k].data = [];
+              loadFromLocalByMode("period");
+              applySheetDefsByModeAndTrim();
+              refreshUI();
+              setActive(activeKey || "company");
+            }
+          });
+        }
+      }, 100);
     }
 
     // expose (so app.js / toolbar_ops can call)

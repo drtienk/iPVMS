@@ -211,6 +211,7 @@ SAFE TO REPLACE WHOLE BLOCK
       </select>
 
       <button type="button" id="sheetAdminBtn" class="btn-dark" style="display:none;">分頁管理</button>
+      <button type="button" id="checkButtonAdminBtn" class="btn-dark" style="display:none;">CheckButton Admin</button>
       <button type="button" id="userAdminBtn" class="btn-violet" style="display:none;">User 管理</button>
       <button type="button" id="logoutBtn" class="btn-danger">登出</button>
     </div>
@@ -352,6 +353,40 @@ SAFE TO REPLACE WHOLE BLOCK
 
 
   <!-- ======================================
+  BLOCK: 27A_UI_MODAL_CHECK_BUTTON_ADMIN
+  AREA: BODY / check button admin modal
+  SAFE TO REPLACE WHOLE BLOCK
+  ====================================== -->
+  <div id="checkButtonAdminModal" class="modal">
+    <div class="modal-card">
+      <div class="modal-head">
+        <div id="checkButtonAdminTitle" style="font-weight:800;">🔧 Check Button Visibility (company-scoped)</div>
+        <button type="button" id="checkButtonAdminClose" class="btn-gray">Close</button>
+      </div>
+
+      <div class="admin-cols">
+        <div class="admin-col">
+          <div id="checkButtonAdminModelTitle" style="font-weight:800; margin-bottom:8px;">Model Tabs</div>
+          <div id="checkButtonAdminListModel" class="admin-list"></div>
+        </div>
+
+        <div class="admin-col">
+          <div id="checkButtonAdminPeriodTitle" style="font-weight:800; margin-bottom:8px;">Period Tabs</div>
+          <div id="checkButtonAdminListPeriod" class="admin-list"></div>
+        </div>
+      </div>
+
+      <div class="modal-foot">
+        <button type="button" id="checkButtonAdminAllOn" class="btn-ok">All On</button>
+        <button type="button" id="checkButtonAdminAllOff" class="btn-gray">All Off</button>
+        <button type="button" id="checkButtonAdminSave">Save & Apply</button>
+      </div>
+    </div>
+  </div>
+  <!-- ========= END BLOCK: 27A_UI_MODAL_CHECK_BUTTON_ADMIN ========= -->
+
+
+  <!-- ======================================
   BLOCK: 28_UI_MODAL_PERIOD_PICKER
   AREA: BODY / period picker modal
   SAFE TO REPLACE WHOLE BLOCK
@@ -470,6 +505,7 @@ SAFE TO REPLACE WHOLE BLOCK
 <script src="js/visibility_store.js"></script>
 <script src="js/period_store.js"></script>
 <script src="js/user_directory_store.js"></script>
+<script src="js/check_visibility_store.js"></script>
 
 <script src="js/mode_storage_store.js"></script>
 <script src="js/sheets_core_store.js"></script>
@@ -488,6 +524,7 @@ SAFE TO REPLACE WHOLE BLOCK
 
 <script src="js/toolbar_ops.js"></script>
 <script src="js/sheet_admin_ui.js"></script>
+<script src="js/check_button_admin_ui.js"></script>
 <script src="js/period_ui.js"></script>
 
 <!-- router/app core -->
@@ -502,6 +539,7 @@ SAFE TO REPLACE WHOLE BLOCK
 
 <script src="js/toolbar_delegate.js"></script>
 <script src="js/sheet_admin_delegate.js"></script>
+<script src="js/check_button_admin_delegate.js"></script>
 <script src="js/user_admin_stub.js"></script>
 
 <script src="js/user_added_col_flag.js"></script>

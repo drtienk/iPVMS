@@ -72,6 +72,7 @@ console.log("✅ [19] app_init loaded");
       // ====== 1) admin buttons ======
       if (typeof window.isAdmin === "function" && window.isAdmin()) {
         if (document.getElementById("sheetAdminBtn")) document.getElementById("sheetAdminBtn").style.display = "";
+        if (document.getElementById("checkButtonAdminBtn")) document.getElementById("checkButtonAdminBtn").style.display = "";
         if (document.getElementById("userAdminBtn")) document.getElementById("userAdminBtn").style.display = "";
       }
 

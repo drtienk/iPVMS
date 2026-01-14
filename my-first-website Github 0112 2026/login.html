@@ -119,6 +119,28 @@
       <select id="company" disabled>
         <option value="">-- Select a company --</option>
       </select>
+      <button id="createCompanyBtn" type="button" style="display:none; margin-top:8px; width:100%; padding:8px; background:#10b981; color:#fff; border:0; border-radius:8px; cursor:pointer; font-weight:600;">Create New Company</button>
+      <button id="deleteCompanyBtn" type="button" style="display:none; margin-top:8px; width:100%; padding:8px; background:#ef4444; color:#fff; border:0; border-radius:8px; cursor:pointer; font-weight:600;">Delete Company</button>
+    </div>
+
+    <!-- User Company Name Input: 預設隱藏 -->
+    <div id="userCompanyRow" style="display:none;">
+      <label id="userCompanyLabel">Enter Company Name</label>
+      <input id="userCompanyName" type="text" placeholder="e.g., John.co">
+      <button id="confirmCompanyBtn" type="button" style="margin-top:8px; width:100%; padding:8px; background:#10b981; color:#fff; border:0; border-radius:8px; cursor:pointer; font-weight:600;">Confirm</button>
+    </div>
+
+    <!-- Admin User Management: 預設隱藏 -->
+    <div id="adminUserManagement" style="display:none; margin-top:20px; padding:12px; border:1px solid #d1d5db; border-radius:8px; background:#f9fafb;">
+      <div style="font-weight:800; margin-bottom:12px;">User List (Admin)</div>
+      <div id="userListContainer" style="margin-bottom:16px;"></div>
+      <div style="border-top:1px solid #d1d5db; padding-top:12px;">
+        <div style="font-weight:600; margin-bottom:8px;">Add User</div>
+        <input id="newUsername" type="text" placeholder="Username" style="width:100%; padding:6px; margin-bottom:6px; box-sizing:border-box;">
+        <input id="newPassword" type="password" placeholder="Password" style="width:100%; padding:6px; margin-bottom:8px; box-sizing:border-box;">
+        <button id="addUserBtn" type="button" style="width:100%; padding:8px; background:#3b82f6; color:#fff; border:0; border-radius:6px; cursor:pointer; font-weight:600;">Add User</button>
+        <p id="userMsg" style="margin-top:8px; color:#ef4444; font-size:13px; min-height:18px;"></p>
+      </div>
     </div>
 
     <button id="loginBtn" onclick="login()">Next</button>
@@ -131,32 +153,143 @@
     /* =============================
        帳號資料（前端假資料）
        ============================= */
-      const USER_ACCOUNTS = {
+      // Seed accounts (hardcoded defaults)
+      const USER_ACCOUNTS_SEED = {
         admin: { password: "admin", role: "admin" },
-
-        user1: {
-          password: "user1",
-          role: "user",
-          companyId: "TEST_CO",
-          companyName: "TEST CO."
-        },
-
-        user2: {
-          password: "user2",
-          role: "user",
-          companyId: "ABC_CO",
-          companyName: "ABC CO."
-        }
+        user1: { password: "user1", role: "user" },
+        user2: { password: "user2", role: "user" }
       };
 
+      // Storage key for persisted accounts
+      const USER_ACCOUNTS_STORE_KEY = "miniExcel_user_accounts_v1";
 
-    const COMPANY_LIST = ["TEST CO.", "ABC CO."];
-    const COMPANY_ID_MAP = {
-  "TEST CO.": "TEST_CO",
-  "ABC CO.": "ABC_CO"
-};
+      /* =============================
+         User Accounts Persistence Helpers
+         ============================= */
+      function loadUserAccounts() {
+        try {
+          const raw = localStorage.getItem(USER_ACCOUNTS_STORE_KEY);
+          if (!raw) return null;
+          const parsed = JSON.parse(raw);
+          return typeof parsed === "object" && parsed !== null ? parsed : null;
+        } catch {
+          return null;
+        }
+      }
+
+      function saveUserAccounts(accounts) {
+        try {
+          // Ensure admin account always exists
+          if (!accounts.admin) {
+            accounts.admin = USER_ACCOUNTS_SEED.admin;
+          }
+          localStorage.setItem(USER_ACCOUNTS_STORE_KEY, JSON.stringify(accounts));
+          return true;
+        } catch (err) {
+          console.error("[login] Failed to save user accounts:", err);
+          return false;
+        }
+      }
+
+      function getUserAccounts() {
+        const stored = loadUserAccounts();
+        if (stored === null) {
+          // Storage empty, return seed only
+          return { ...USER_ACCOUNTS_SEED };
+        }
+        // Storage exists, return stored (admin is protected in saveUserAccounts)
+        return { ...stored };
+      }
+
+
+    // Company Directory (persisted in localStorage)
+    const COMPANY_DIR_KEY = "miniExcel_company_directory_v1";
+    const TEMPLATE_COMPANY_ID = "TEST_CO";
+
+    function loadCompanyDirectory() {
+      try {
+        const raw = localStorage.getItem(COMPANY_DIR_KEY);
+        if (!raw) return null;
+        const parsed = JSON.parse(raw);
+        return Array.isArray(parsed) ? parsed : null;
+      } catch {
+        return null;
+      }
+    }
+
+    function saveCompanyDirectory(directory) {
+      try {
+        localStorage.setItem(COMPANY_DIR_KEY, JSON.stringify(directory));
+        return true;
+      } catch (err) {
+        console.error("[login] Failed to save company directory:", err);
+        return false;
+      }
+    }
+
+    function getCompanyDirectory() {
+      const saved = loadCompanyDirectory();
+      if (saved && saved.length > 0) {
+        return saved;
+      }
+      // Fallback to hardcoded list
+      return [
+        { companyName: "TEST CO.", companyId: "TEST_CO" },
+        { companyName: "ABC CO.", companyId: "ABC_CO" }
+      ];
+    }
+
+    function generateCompanyId(companyName) {
+      return String(companyName || "")
+        .toUpperCase()
+        .replace(/[^A-Z0-9]/g, "_")
+        .replace(/_+/g, "_")
+        .replace(/^_|_$/g, "") || "COMPANY";
+    }
+
+    // Legacy constants for backward compatibility
+    const COMPANY_LIST = getCompanyDirectory().map(c => c.companyName);
+    const COMPANY_ID_MAP = {};
+    getCompanyDirectory().forEach(c => {
+      COMPANY_ID_MAP[c.companyName] = c.companyId;
+    });
 
     let isAdminVerified = false;
+    let isUserVerified = false;
+    let currentUsername = "";
+
+    /* =============================
+       User Company Binding Helpers
+       ============================= */
+    const USER_COMPANY_MAP_KEY = "miniExcel_user_company_map_v1";
+
+    function loadUserCompanyMap() {
+      try {
+        const raw = localStorage.getItem(USER_COMPANY_MAP_KEY);
+        if (!raw) return {};
+        const parsed = JSON.parse(raw);
+        return typeof parsed === "object" && parsed !== null ? parsed : {};
+      } catch {
+        return {};
+      }
+    }
+
+    function saveUserCompany(username, companyId, companyName) {
+      try {
+        const map = loadUserCompanyMap();
+        map[username] = { companyId, companyName };
+        localStorage.setItem(USER_COMPANY_MAP_KEY, JSON.stringify(map));
+        return true;
+      } catch (err) {
+        console.error("[login] Failed to save user company binding:", err);
+        return false;
+      }
+    }
+
+    function getUserCompany(username) {
+      const map = loadUserCompanyMap();
+      return map[username] || null;
+    }
 
     /* =============================
        ✅ 語言系統：預設英文、可切中文
@@ -170,10 +303,15 @@
         passLabel: "Password",
         companyLabel: "Company (Admin only)",
         companyPlaceholder: "-- Select a company --",
+        btnCreateCompany: "Create New Company",
+        userCompanyLabel: "Enter Company Name",
+        userCompanyPlaceholder: "e.g., John.co",
+        btnConfirm: "Confirm",
         btnNext: "Next",
         btnLogin: "Login",
         btnBack: "Back",
         msgPickCompany: "Please select a company",
+        msgEnterCompany: "Please enter company name",
         msgBadCred: "Invalid username or password",
         msgRoleErr: "Role configuration error"
       },
@@ -185,10 +323,15 @@
         passLabel: "密碼",
         companyLabel: "公司（僅限管理員）",
         companyPlaceholder: "-- 請選擇公司 --",
+        btnCreateCompany: "建立新公司",
+        userCompanyLabel: "輸入公司名稱",
+        userCompanyPlaceholder: "例如：John.co",
+        btnConfirm: "確認",
         btnNext: "下一步",
         btnLogin: "登入",
         btnBack: "回到上一頁",
         msgPickCompany: "請選擇公司",
+        msgEnterCompany: "請輸入公司名稱",
         msgBadCred: "帳號或密碼錯誤",
         msgRoleErr: "角色設定錯誤"
       }
@@ -210,6 +353,15 @@
       document.getElementById("userLabel").textContent = t.userLabel;
       document.getElementById("passLabel").textContent = t.passLabel;
       document.getElementById("companyLabel").textContent = t.companyLabel;
+      const createBtn = document.getElementById("createCompanyBtn");
+      if (createBtn) createBtn.textContent = t.btnCreateCompany;
+
+      const userCompanyLabel = document.getElementById("userCompanyLabel");
+      if (userCompanyLabel) userCompanyLabel.textContent = t.userCompanyLabel;
+      const userCompanyInput = document.getElementById("userCompanyName");
+      if (userCompanyInput) userCompanyInput.placeholder = t.userCompanyPlaceholder;
+      const confirmBtn = document.getElementById("confirmCompanyBtn");
+      if (confirmBtn) confirmBtn.textContent = t.btnConfirm;
 
       // 公司下拉第一個選項文字
       const companySelect = document.getElementById("company");
@@ -218,7 +370,7 @@
       }
 
       // 按鈕文字要依「目前是第幾步」決定
-      document.getElementById("loginBtn").textContent = (isAdminVerified ? t.btnLogin : t.btnNext);
+      document.getElementById("loginBtn").textContent = (isAdminVerified || isUserVerified ? t.btnLogin : t.btnNext);
       document.getElementById("backBtn").textContent = t.btnBack;
 
       // msg 不強制翻譯舊內容（避免切語言把訊息弄亂），切語言先清空
@@ -245,17 +397,48 @@
       // 預設隱藏公司列
       document.getElementById("companyRow").style.display = "none";
       document.getElementById("company").disabled = true;
+      document.getElementById("userCompanyRow").style.display = "none";
+
+      // Bind create company button
+      const createBtn = document.getElementById("createCompanyBtn");
+      if (createBtn) {
+        createBtn.addEventListener("click", createNewCompany);
+      }
+
+      // Bind confirm company button
+      const confirmCompanyBtn = document.getElementById("confirmCompanyBtn");
+      if (confirmCompanyBtn) {
+        confirmCompanyBtn.addEventListener("click", confirmUserCompany);
+      }
+
+      // Bind add user button
+      const addUserBtn = document.getElementById("addUserBtn");
+      if (addUserBtn) {
+        addUserBtn.addEventListener("click", addNewUser);
+      }
+
+      // Bind delete company button
+      const deleteCompanyBtn = document.getElementById("deleteCompanyBtn");
+      if (deleteCompanyBtn) {
+        deleteCompanyBtn.addEventListener("click", deleteCompany);
+      }
 
       // 焦點
       document.getElementById("username").focus();
 
-      // Enter 觸發登入（選單上不觸發）
+      // Enter 觸發登入或確認（選單上不觸發）
       document.addEventListener("keydown", (e) => {
         if (e.key !== "Enter") return;
         const active = document.activeElement;
         if (active && active.tagName === "SELECT") return;
         e.preventDefault();
-        login();
+        
+        // 如果在公司名稱輸入框，觸發確認
+        if (active && active.id === "userCompanyName") {
+          confirmUserCompany();
+        } else {
+          login();
+        }
       });
     });
 
@@ -264,6 +447,126 @@
       localStorage.setItem("app_lang", this.value);
       applyLanguage(this.value);
     });
+
+    /* =============================
+       從模板複製公司資料
+       ============================= */
+    function cloneCompanyFromTemplate(companyId, companyName) {
+      const templateId = TEMPLATE_COMPANY_ID;
+      const logPrefix = `[cloneCompanyFromTemplate]`;
+
+      console.log(`${logPrefix} Cloning: id="${companyId}", name="${companyName}", template="${templateId}"`);
+
+      let success = true;
+
+      // Clone sheet visibility
+      const visibilityKeyTemplate = `miniExcel_sheet_visibility_v1__${templateId}`;
+      const visibilityKeyNew = `miniExcel_sheet_visibility_v1__${companyId}`;
+      try {
+        const visibilityData = localStorage.getItem(visibilityKeyTemplate);
+        if (visibilityData) {
+          localStorage.setItem(visibilityKeyNew, visibilityData);
+          console.log(`${logPrefix} ✅ Cloned: ${visibilityKeyTemplate} -> ${visibilityKeyNew}`);
+        } else {
+          console.log(`${logPrefix} ⚠️ Template visibility not found: ${visibilityKeyTemplate}`);
+        }
+      } catch (err) {
+        console.error(`${logPrefix} ❌ Failed to clone visibility:`, err);
+        success = false;
+      }
+
+      // Clone check visibility per-tab
+      const checkVisibilityKeyTemplate = `check_visibility_per_tab_company_${templateId}`;
+      const checkVisibilityKeyNew = `check_visibility_per_tab_company_${companyId}`;
+      try {
+        const checkVisibilityData = localStorage.getItem(checkVisibilityKeyTemplate);
+        if (checkVisibilityData) {
+          localStorage.setItem(checkVisibilityKeyNew, checkVisibilityData);
+          console.log(`${logPrefix} ✅ Cloned: ${checkVisibilityKeyTemplate} -> ${checkVisibilityKeyNew}`);
+        } else {
+          console.log(`${logPrefix} ⚠️ Template check visibility not found: ${checkVisibilityKeyTemplate}`);
+        }
+      } catch (err) {
+        console.error(`${logPrefix} ❌ Failed to clone check visibility:`, err);
+        success = false;
+      }
+
+      // Clone model workspace
+      const modelKeyTemplate = `miniExcel_autosave_model_v4__${templateId}`;
+      const modelKeyNew = `miniExcel_autosave_model_v4__${companyId}`;
+      try {
+        const modelData = localStorage.getItem(modelKeyTemplate);
+        if (modelData) {
+          const parsed = JSON.parse(modelData);
+          // Clear all cell data, keep structure
+          const cloned = {};
+          for (const sheetKey in parsed) {
+            const sheet = parsed[sheetKey];
+            cloned[sheetKey] = {
+              headers: Array.isArray(sheet.headers) ? [...sheet.headers] : [],
+              cols: sheet.cols || 0,
+              rows: sheet.rows || 0,
+              meta: sheet.meta ? JSON.parse(JSON.stringify(sheet.meta)) : {},
+              data: Array(sheet.rows || 0).fill(null).map(() => Array(sheet.cols || 0).fill(""))
+            };
+          }
+          localStorage.setItem(modelKeyNew, JSON.stringify(cloned));
+          console.log(`${logPrefix} ✅ Cloned: ${modelKeyTemplate} -> ${modelKeyNew} (cleared data)`);
+        } else {
+          console.log(`${logPrefix} ⚠️ Template model workspace not found: ${modelKeyTemplate}`);
+        }
+      } catch (err) {
+        console.error(`${logPrefix} ❌ Failed to clone model workspace:`, err);
+        success = false;
+      }
+
+      // Clone period workspaces (clone all periods)
+      try {
+        const periodListKeyTemplate = `miniExcel_period_list_v1__${templateId}`;
+        const periodListKeyNew = `miniExcel_period_list_v1__${companyId}`;
+        const periodListData = localStorage.getItem(periodListKeyTemplate);
+        let periods = [];
+        if (periodListData) {
+          periods = JSON.parse(periodListData);
+          localStorage.setItem(periodListKeyNew, periodListData);
+          console.log(`${logPrefix} ✅ Cloned period list: ${periodListKeyTemplate} -> ${periodListKeyNew}`);
+        }
+
+        // Clone each period workspace
+        periods.forEach(period => {
+          const periodKeyTemplate = `miniExcel_autosave_period_v4__${templateId}__${period}`;
+          const periodKeyNew = `miniExcel_autosave_period_v4__${companyId}__${period}`;
+          try {
+            const periodData = localStorage.getItem(periodKeyTemplate);
+            if (periodData) {
+              const parsed = JSON.parse(periodData);
+              // Clear all cell data, keep structure
+              const cloned = {};
+              for (const sheetKey in parsed) {
+                const sheet = parsed[sheetKey];
+                cloned[sheetKey] = {
+                  headers: Array.isArray(sheet.headers) ? [...sheet.headers] : [],
+                  cols: sheet.cols || 0,
+                  rows: sheet.rows || 0,
+                  meta: sheet.meta ? JSON.parse(JSON.stringify(sheet.meta)) : {},
+                  data: Array(sheet.rows || 0).fill(null).map(() => Array(sheet.cols || 0).fill(""))
+                };
+              }
+              localStorage.setItem(periodKeyNew, JSON.stringify(cloned));
+              console.log(`${logPrefix} ✅ Cloned: ${periodKeyTemplate} -> ${periodKeyNew} (cleared data)`);
+            }
+          } catch (err) {
+            console.error(`${logPrefix} ❌ Failed to clone period workspace ${period}:`, err);
+            success = false;
+          }
+        });
+      } catch (err) {
+        console.error(`${logPrefix} ❌ Failed to clone period workspaces:`, err);
+        success = false;
+      }
+
+      return success;
+    }
 
     /* =============================
        顯示公司下拉 + 載入公司
@@ -276,15 +579,33 @@
 
       companyRow.style.display = "block";
       companySelect.disabled = false;
+      
+      // Show create company button (admin step-2 only)
+      const createBtn = document.getElementById("createCompanyBtn");
+      if (createBtn) createBtn.style.display = "block";
+
+      // Show delete company button (admin step-2 only)
+      const deleteBtn = document.getElementById("deleteCompanyBtn");
+      if (deleteBtn) {
+        deleteBtn.style.display = "block";
+        updateDeleteCompanyButtonState();
+      }
 
       // 清掉舊選項（保留第 0 個 placeholder）
       while (companySelect.options.length > 1) companySelect.remove(1);
 
-      COMPANY_LIST.forEach((name) => {
+      // Load from directory
+      const directory = getCompanyDirectory();
+      directory.forEach((item) => {
         const opt = document.createElement("option");
-        opt.value = name;
-        opt.textContent = name;
+        opt.value = item.companyName;
+        opt.textContent = item.companyName;
         companySelect.appendChild(opt);
+      });
+
+      // Update COMPANY_ID_MAP for legacy code
+      directory.forEach(c => {
+        COMPANY_ID_MAP[c.companyName] = c.companyId;
       });
 
       // 依語言更新文字
@@ -292,6 +613,343 @@
       loginBtn.textContent = t.btnLogin;
       backBtn.style.display = "block";
       companySelect.focus();
+
+      // Show and render user management
+      const userManagement = document.getElementById("adminUserManagement");
+      if (userManagement) {
+        userManagement.style.display = "block";
+        renderUserList();
+      }
+
+      // Bind company select change to update delete button state
+      companySelect.addEventListener("change", updateDeleteCompanyButtonState);
+    }
+
+    /* =============================
+       更新刪除公司按鈕狀態
+       ============================= */
+    function updateDeleteCompanyButtonState() {
+      const companySelect = document.getElementById("company");
+      const deleteBtn = document.getElementById("deleteCompanyBtn");
+      
+      if (!companySelect || !deleteBtn) return;
+
+      const selectedCompanyName = companySelect.value;
+      if (!selectedCompanyName) {
+        deleteBtn.disabled = true;
+        return;
+      }
+
+      const selectedCompanyId = COMPANY_ID_MAP[selectedCompanyName];
+      if (selectedCompanyId === TEMPLATE_COMPANY_ID) {
+        deleteBtn.disabled = true;
+      } else {
+        deleteBtn.disabled = false;
+      }
+    }
+
+    /* =============================
+       刪除公司（完整清理）
+       ============================= */
+    function deleteCompany() {
+      const companySelect = document.getElementById("company");
+      if (!companySelect || !companySelect.value) return;
+
+      const companyName = companySelect.value;
+      const companyId = COMPANY_ID_MAP[companyName];
+
+      // Safety checks
+      if (!companyId || companyId === TEMPLATE_COMPANY_ID) {
+        alert("Cannot delete template company or invalid selection");
+        return;
+      }
+
+      // Confirm deletion
+      if (!confirm("Delete this company and ALL its data?")) {
+        return;
+      }
+
+      console.log(`[deleteCompany] Starting deletion: name="${companyName}", id="${companyId}"`);
+
+      // A) Remove from company directory
+      const directory = getCompanyDirectory();
+      const filtered = directory.filter(c => c.companyId !== companyId);
+      if (saveCompanyDirectory(filtered)) {
+        console.log(`[deleteCompany] ✅ Removed from directory: ${companyName} (${companyId})`);
+      } else {
+        console.error(`[deleteCompany] ❌ Failed to remove from directory`);
+      }
+
+      // B) Delete all localStorage keys for this company
+      const keysToDelete = [];
+      try {
+        for (let i = 0; i < localStorage.length; i++) {
+          const key = localStorage.key(i);
+          if (!key) continue;
+
+          // Check all prefixes
+          if (key === `miniExcel_sheet_visibility_v1__${companyId}` ||
+              key === `check_visibility_per_tab_company_${companyId}` ||
+              key === `miniExcel_period_list_v1__${companyId}` ||
+              (key.startsWith(`miniExcel_autosave_model_`) && key.endsWith(`__${companyId}`)) ||
+              (key.startsWith(`miniExcel_autosave_period_`) && key.includes(`__${companyId}__`))) {
+            keysToDelete.push(key);
+          }
+        }
+
+        keysToDelete.forEach(key => {
+          try {
+            localStorage.removeItem(key);
+            console.log(`[deleteCompany] ✅ Deleted key: ${key}`);
+          } catch (err) {
+            console.error(`[deleteCompany] ❌ Failed to delete key ${key}:`, err);
+          }
+        });
+
+        console.log(`[deleteCompany] ✅ Deleted ${keysToDelete.length} localStorage keys`);
+      } catch (err) {
+        console.error(`[deleteCompany] ❌ Failed to scan/delete localStorage keys:`, err);
+      }
+
+      // C) Clean up user → company bindings
+      try {
+        const map = loadUserCompanyMap();
+        let removedCount = 0;
+        Object.keys(map).forEach(username => {
+          if (map[username] && map[username].companyId === companyId) {
+            delete map[username];
+            removedCount++;
+          }
+        });
+        if (removedCount > 0) {
+          localStorage.setItem(USER_COMPANY_MAP_KEY, JSON.stringify(map));
+          console.log(`[deleteCompany] ✅ Removed ${removedCount} user-company bindings`);
+        } else {
+          console.log(`[deleteCompany] ℹ️ No user-company bindings found for this company`);
+        }
+      } catch (err) {
+        console.error(`[deleteCompany] ❌ Failed to clean user-company bindings:`, err);
+      }
+
+      // Check if admin was logged into this company
+      try {
+        const loggedCompanyId = sessionStorage.getItem("companyId");
+        if (loggedCompanyId === companyId) {
+          // Force admin back to login step
+          sessionStorage.clear();
+          alert("Company deleted. You have been logged out.");
+          window.location.reload();
+          return;
+        }
+      } catch (err) {
+        console.error(`[deleteCompany] ❌ Failed to check session:`, err);
+      }
+
+      // Refresh UI
+      companySelect.value = "";
+      showCompanyDropdown();
+      renderUserList();
+
+      console.log(`[deleteCompany] ✅ Deletion complete: ${companyName} (${companyId})`);
+    }
+
+    /* =============================
+       渲染使用者列表
+       ============================= */
+    function renderUserList() {
+      const container = document.getElementById("userListContainer");
+      if (!container) return;
+
+      container.innerHTML = "";
+
+      // Create table
+      const table = document.createElement("table");
+      table.style.width = "100%";
+      table.style.borderCollapse = "collapse";
+      table.style.fontSize = "13px";
+
+      // Header row
+      const headerRow = document.createElement("tr");
+      headerRow.style.borderBottom = "2px solid #d1d5db";
+      headerRow.style.backgroundColor = "#f3f4f6";
+      ["Username", "Role", "Company Name", "Actions"].forEach(text => {
+        const th = document.createElement("th");
+        th.textContent = text;
+        th.style.padding = "8px";
+        th.style.textAlign = "left";
+        headerRow.appendChild(th);
+      });
+      table.appendChild(headerRow);
+
+      // Data rows
+      const accounts = getUserAccounts();
+      Object.keys(accounts).forEach(username => {
+        const account = accounts[username];
+        const userCompany = getUserCompany(username);
+        const companyName = userCompany ? userCompany.companyName : "Not assigned";
+        const isAdmin = account.role === "admin";
+
+        const row = document.createElement("tr");
+        row.style.borderBottom = "1px solid #e5e7eb";
+
+        const usernameCell = document.createElement("td");
+        usernameCell.textContent = username;
+        usernameCell.style.padding = "8px";
+        row.appendChild(usernameCell);
+
+        const roleCell = document.createElement("td");
+        roleCell.textContent = account.role || "user";
+        roleCell.style.padding = "8px";
+        row.appendChild(roleCell);
+
+        const companyCell = document.createElement("td");
+        companyCell.textContent = companyName;
+        companyCell.style.padding = "8px";
+        companyCell.style.color = companyName === "Not assigned" ? "#6b7280" : "#111827";
+        row.appendChild(companyCell);
+
+        const actionsCell = document.createElement("td");
+        actionsCell.style.padding = "8px";
+        if (!isAdmin) {
+          const deleteBtn = document.createElement("button");
+          deleteBtn.textContent = "Delete";
+          deleteBtn.style.padding = "4px 8px";
+          deleteBtn.style.background = "#ef4444";
+          deleteBtn.style.color = "#fff";
+          deleteBtn.style.border = "0";
+          deleteBtn.style.borderRadius = "4px";
+          deleteBtn.style.cursor = "pointer";
+          deleteBtn.style.fontSize = "12px";
+          deleteBtn.onclick = () => deleteUser(username);
+          actionsCell.appendChild(deleteBtn);
+        }
+        row.appendChild(actionsCell);
+
+        table.appendChild(row);
+      });
+
+      container.appendChild(table);
+    }
+
+    /* =============================
+       新增使用者
+       ============================= */
+    function addNewUser() {
+      const usernameInput = document.getElementById("newUsername");
+      const passwordInput = document.getElementById("newPassword");
+      const msgEl = document.getElementById("userMsg");
+
+      if (!usernameInput || !passwordInput || !msgEl) return;
+
+      const username = usernameInput.value.trim();
+      const password = passwordInput.value.trim();
+
+      msgEl.textContent = "";
+
+      // Validate
+      if (!username || !password) {
+        msgEl.textContent = "Username and password are required";
+        return;
+      }
+
+      // Check duplicate
+      const accounts = getUserAccounts();
+      if (accounts[username]) {
+        msgEl.textContent = "Username already exists";
+        return;
+      }
+
+      // Add to accounts
+      accounts[username] = {
+        password: password,
+        role: "user"
+      };
+
+      // Save to localStorage
+      saveUserAccounts(accounts);
+
+      // Clear inputs
+      usernameInput.value = "";
+      passwordInput.value = "";
+
+      // Refresh user list
+      renderUserList();
+
+      msgEl.textContent = `User "${username}" added successfully`;
+      msgEl.style.color = "#10b981";
+    }
+
+    /* =============================
+       刪除使用者
+       ============================= */
+    function deleteUser(username) {
+      if (!confirm("Delete user?")) return;
+
+      const accounts = getUserAccounts();
+      
+      // Prevent deleting admin
+      if (accounts[username] && accounts[username].role === "admin") {
+        alert("Cannot delete admin account");
+        return;
+      }
+
+      // Remove from accounts
+      delete accounts[username];
+      saveUserAccounts(accounts);
+
+      // Remove from user company binding
+      try {
+        const map = loadUserCompanyMap();
+        if (map[username]) {
+          delete map[username];
+          localStorage.setItem(USER_COMPANY_MAP_KEY, JSON.stringify(map));
+        }
+      } catch (err) {
+        console.error("[deleteUser] Failed to remove company binding:", err);
+      }
+
+      // Re-render user list
+      renderUserList();
+    }
+
+    /* =============================
+       建立新公司（從模板複製）
+       ============================= */
+    function createNewCompany() {
+      const t = I18N[getLang()] || I18N.en;
+      const companyName = prompt(t.btnCreateCompany + "\n\nEnter company name:");
+      if (!companyName || !companyName.trim()) return;
+
+      const trimmedName = companyName.trim();
+      const newCompanyId = generateCompanyId(trimmedName);
+      const templateId = TEMPLATE_COMPANY_ID;
+
+      console.log(`[createNewCompany] Creating: name="${trimmedName}", id="${newCompanyId}"`);
+
+      // Check if company already exists
+      const directory = getCompanyDirectory();
+      if (directory.some(c => c.companyName === trimmedName || c.companyId === newCompanyId)) {
+        alert("Company name or ID already exists!");
+        return;
+      }
+
+      // Clone from template
+      cloneCompanyFromTemplate(newCompanyId, trimmedName);
+
+      // Add to directory
+      directory.push({ companyName: trimmedName, companyId: newCompanyId });
+      if (saveCompanyDirectory(directory)) {
+        console.log(`[createNewCompany] ✅ Added to directory: ${trimmedName} (${newCompanyId})`);
+      } else {
+        console.error(`[createNewCompany] ❌ Failed to save directory`);
+      }
+
+      // Refresh dropdown and select new company
+      showCompanyDropdown();
+      const companySelect = document.getElementById("company");
+      if (companySelect) companySelect.value = trimmedName;
+
+      alert(`Company "${trimmedName}" created successfully!\nCompany ID: ${newCompanyId}\n\nCloned from template: ${templateId}`);
     }
 
     /* =============================
@@ -306,7 +964,8 @@
 
       msgEl.textContent = "";
 
-      const account = USER_ACCOUNTS[u];
+      const accounts = getUserAccounts();
+      const account = accounts[u];
       if (!account || account.password !== p) {
         msgEl.textContent = t.msgBadCred;
         return;
@@ -338,16 +997,24 @@ return;
 
       }
 
-      // user 直接登入
-      // user 直接登入（公司已綁定）
+      // user 登入流程
       if (account.role === "user") {
+        const userCompany = getUserCompany(u);
+        
+        // 如果沒有綁定公司，顯示公司名稱輸入畫面
+        if (!userCompany) {
+          isUserVerified = true;
+          currentUsername = u;
+          showUserCompanyInput();
+          msgEl.textContent = t.msgEnterCompany;
+          return;
+        }
+
+        // 如果有綁定，直接登入
         sessionStorage.setItem("loggedIn", "yes");
         sessionStorage.setItem("role", "user");
-
-        // ✅ 自動帶公司
-        sessionStorage.setItem("companyId", account.companyId);
-        sessionStorage.setItem("companyName", account.companyName);
-
+        sessionStorage.setItem("companyId", userCompany.companyId);
+        sessionStorage.setItem("companyName", userCompany.companyName);
         window.location.href = "./app.html";
         return;
       }
@@ -357,22 +1024,127 @@ return;
     }
 
     /* =============================
+       顯示使用者公司名稱輸入畫面
+       ============================= */
+    function showUserCompanyInput() {
+      const userCompanyRow = document.getElementById("userCompanyRow");
+      const loginBtn = document.getElementById("loginBtn");
+      const backBtn = document.getElementById("backBtn");
+      const usernameInput = document.getElementById("username");
+      const passwordInput = document.getElementById("password");
+      const t = I18N[getLang()] || I18N.en;
+
+      userCompanyRow.style.display = "block";
+      loginBtn.style.display = "none";
+      backBtn.style.display = "block";
+      usernameInput.disabled = true;
+      passwordInput.disabled = true;
+
+      loginBtn.textContent = t.btnLogin;
+      backBtn.textContent = t.btnBack;
+
+      const userCompanyInput = document.getElementById("userCompanyName");
+      if (userCompanyInput) {
+        userCompanyInput.focus();
+        userCompanyInput.value = "";
+      }
+    }
+
+    /* =============================
+       確認使用者公司名稱並建立公司
+       ============================= */
+    function confirmUserCompany() {
+      const userCompanyInput = document.getElementById("userCompanyName");
+      const msgEl = document.getElementById("msg");
+      const t = I18N[getLang()] || I18N.en;
+
+      if (!userCompanyInput || !currentUsername) return;
+
+      const companyName = userCompanyInput.value.trim();
+      if (!companyName) {
+        msgEl.textContent = t.msgEnterCompany;
+        return;
+      }
+
+      const newCompanyId = generateCompanyId(companyName);
+      const templateId = TEMPLATE_COMPANY_ID;
+
+      console.log(`[confirmUserCompany] Creating company for user: username="${currentUsername}", company="${companyName}", id="${newCompanyId}"`);
+
+      // Check if company already exists in directory
+      const directory = getCompanyDirectory();
+      const existingCompany = directory.find(c => c.companyName === companyName || c.companyId === newCompanyId);
+      
+      let finalCompanyId = newCompanyId;
+      let finalCompanyName = companyName;
+
+      if (!existingCompany) {
+        // Create new company by cloning from template
+        cloneCompanyFromTemplate(finalCompanyId, finalCompanyName);
+
+        // Add to directory
+        directory.push({ companyName: finalCompanyName, companyId: finalCompanyId });
+        saveCompanyDirectory(directory);
+        console.log(`[confirmUserCompany] ✅ Added to directory: ${finalCompanyName} (${finalCompanyId})`);
+      } else {
+        // Use existing company
+        finalCompanyId = existingCompany.companyId;
+        finalCompanyName = existingCompany.companyName;
+        console.log(`[confirmUserCompany] ✅ Using existing company: ${finalCompanyName} (${finalCompanyId})`);
+      }
+
+      // Save user→company binding
+      if (saveUserCompany(currentUsername, finalCompanyId, finalCompanyName)) {
+        console.log(`[confirmUserCompany] ✅ Saved binding: ${currentUsername} -> ${finalCompanyName} (${finalCompanyId})`);
+      }
+
+      // Redirect to app.html
+      sessionStorage.setItem("loggedIn", "yes");
+      sessionStorage.setItem("role", "user");
+      sessionStorage.setItem("companyId", finalCompanyId);
+      sessionStorage.setItem("companyName", finalCompanyName);
+      window.location.href = "./app.html";
+    }
+
+    /* =============================
        回到上一頁（回到輸入帳密狀態）
        ============================= */
     function goBack() {
       const companyRow = document.getElementById("companyRow");
       const companySelect = document.getElementById("company");
+      const userCompanyRow = document.getElementById("userCompanyRow");
       const loginBtn = document.getElementById("loginBtn");
       const backBtn = document.getElementById("backBtn");
       const msgEl = document.getElementById("msg");
+      const usernameInput = document.getElementById("username");
+      const passwordInput = document.getElementById("password");
       const t = I18N[getLang()] || I18N.en;
 
       isAdminVerified = false;
+      isUserVerified = false;
+      currentUsername = "";
 
       companyRow.style.display = "none";
       companySelect.disabled = true;
       companySelect.value = "";
+      userCompanyRow.style.display = "none";
+      
+      // Hide create company button
+      const createBtn = document.getElementById("createCompanyBtn");
+      if (createBtn) createBtn.style.display = "none";
 
+      // Hide delete company button
+      const deleteBtn = document.getElementById("deleteCompanyBtn");
+      if (deleteBtn) deleteBtn.style.display = "none";
+
+      // Hide user management
+      const userManagement = document.getElementById("adminUserManagement");
+      if (userManagement) userManagement.style.display = "none";
+
+      usernameInput.disabled = false;
+      passwordInput.disabled = false;
+
+      loginBtn.style.display = "block";
       loginBtn.textContent = t.btnNext;
       backBtn.style.display = "none";
       msgEl.textContent = "";
@@ -380,6 +1152,12 @@ return;
       document.getElementById("username").focus();
     }
   </script>
+
+  <!-- ✅ Check visibility store (needed for company cloning logic) -->
+  <!-- Load tabs_def.js first to get TAB_CONFIG -->
+  <script src="js/tabs_def.js"></script>
+  <script src="js/check_visibility_store.js"></script>
+  <!-- Note: check_visibility_ui.js is NOT loaded here to prevent showing "Allow users to see Check button" UI on login page -->
 
 </body>
 </html>

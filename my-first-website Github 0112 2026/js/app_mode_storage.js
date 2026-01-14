@@ -86,6 +86,26 @@ console.log("✅ [09] app_mode_storage loaded");
         if (e === "" || /^Col\s+\d+$/i.test(e)) s.meta.dafEnt[c] = "EDU";
       }
     }
+
+    // Model mode: 通用補欄名（新增欄位自動補 Col N）
+    if (activeMode === "model") {
+      const modelMap = window.MODEL_DEF_MAP || window.DEFS?.MODEL_DEF_MAP || {};
+      const def = modelMap[activeKey] || {};
+      const defCols = Number(def.cols) || 1;
+      const changedCols = [];
+
+      for (let c = defCols; c < s.cols; c++) {
+        const cur = String(s.headers[c] ?? "").trim();
+        if (cur === "" || /^Col\s+\d+$/i.test(cur)) {
+          s.headers[c] = `Col ${c + 1}`;
+          changedCols.push(c);
+        }
+      }
+
+      if (changedCols.length > 0) {
+        console.log("✅ [ensureHeadersForActiveSheet]", { activeMode, activeKey, defCols, changedCols });
+      }
+    }
   }
 
   // ✅ expose as window.*
