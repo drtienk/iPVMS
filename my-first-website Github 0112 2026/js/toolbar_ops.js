@@ -425,11 +425,21 @@ window._syncDelColBtnVisibility = _syncDelColBtnVisibility;
         lines.push(row.map(csvCell).join(","));
       }
 
+      // Generate filename with company, mode, period, and sheet name
+      const company = (documentMeta?.companyName || sessionStorage.getItem("companyName") || "Company").trim();
+      const modeTag = (CTX.activeMode === "period") ? "Period" : "Model";
+      const periodTag = (CTX.activeMode === "period" && CTX.activePeriod) ? `_${CTX.activePeriod}` : "";
+      const sheetTag = (s.title || "Sheet").trim();
+      let filename = `${company}_${modeTag}${periodTag}_${sheetTag}.csv`;
+      
+      // Sanitize filename: replace invalid characters with underscore
+      filename = filename.replace(/[\\\/\:\*\?\"\<\>\|]/g, "_").replace(/\s+/g, " ").trim();
+
       const blob = new Blob([lines.join("\n")], { type:"text/csv;charset=utf-8;" });
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = (s.title || "Sheet") + ".csv";
+      a.download = filename;
       a.click();
       URL.revokeObjectURL(url);
     });
@@ -466,7 +476,15 @@ window._syncDelColBtnVisibility = _syncDelColBtnVisibility;
           window.XLSX.utils.book_append_sheet(wb, ws, _makeSafeSheetName(sh.title, used));
         });
 
-        const filename = (CTX.activeMode === "period") ? `Period_${CTX.activePeriod}.xlsx` : "Model.xlsx";
+        // Generate filename with company, mode, and period
+        const company = (documentMeta?.companyName || sessionStorage.getItem("companyName") || "Company").trim();
+        let filename = (CTX.activeMode === "period") 
+          ? `${company}_Period_${CTX.activePeriod}.xlsx`
+          : `${company}_Model.xlsx`;
+        
+        // Sanitize filename: replace invalid characters with underscore
+        filename = filename.replace(/[\\\/\:\*\?\"\<\>\|]/g, "_").replace(/\s+/g, " ").trim();
+        
         window.XLSX.writeFile(wb, filename);
       } catch (err) { showErr(err); }
     });
