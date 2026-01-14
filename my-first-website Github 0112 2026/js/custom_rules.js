@@ -218,7 +218,8 @@ function getActiveKey(){
 // ======================= MODULE 15C_TOOLBAR_VISIBILITY START =======================
 (function toolbarVisibilityGuard(){
 
-  const KEEP_VISIBLE = new Set(["addRowBtn","addColBtn","checkBtn","delColBtn"]); // ✅ 把 delColBtn 加進來
+  // ✅ REMOVED "checkBtn" from KEEP_VISIBLE - Check button visibility is controlled by MODULE 15D
+  const KEEP_VISIBLE = new Set(["addRowBtn","addColBtn","delColBtn"]);
   const HIDE_IDS = [
     "exportCsvBtn",
     "exportXlsxBtn",
@@ -245,12 +246,14 @@ function getActiveKey(){
     // hide the ones you don't want
     HIDE_IDS.forEach(hideEl);
 
-    // show the ones you keep (including Delete Column)
+    // show the ones you keep (NOT including checkBtn - that's handled by MODULE 15D)
     KEEP_VISIBLE.forEach(showEl);
 
     // ✅ 再保險：永遠顯示 delColBtn（不要再被藏）
     const delBtn = document.getElementById("delColBtn");
     if (delBtn) delBtn.style.display = "";
+    
+    // ✅ DO NOT touch checkBtn - let MODULE 15D handle it
   }
 
   window.addEventListener("DOMContentLoaded", () => {
@@ -259,26 +262,30 @@ function getActiveKey(){
     setTimeout(applyToolbarVisibility, 300);
   });
 
-  // Hook refreshUI/render: keep it visible even after UI refresh
+  // Hook refreshUI/render: keep buttons visible even after UI refresh
+  // ✅ Use __hooked flag to avoid double wrapping
   const _refreshUI = window.refreshUI;
-  if (typeof _refreshUI === "function") {
+  if (typeof _refreshUI === "function" && !window.refreshUI.__toolbarVisibilityHooked) {
     window.refreshUI = function(){
       const ret = _refreshUI.apply(this, arguments);
       try { applyToolbarVisibility(); } catch {}
       return ret;
     };
+    window.refreshUI.__toolbarVisibilityHooked = true;
   }
 
   const _render = window.render;
-  if (typeof _render === "function") {
+  if (typeof _render === "function" && !window.render.__toolbarVisibilityHooked) {
     window.render = function(){
       const ret = _render.apply(this, arguments);
       try { applyToolbarVisibility(); } catch {}
       return ret;
     };
+    window.render.__toolbarVisibilityHooked = true;
   }
 
   // ✅ still keep other buttons hidden, but NEVER hide delColBtn
+  // ✅ DO NOT touch checkBtn in interval - let MODULE 15D handle it
   setInterval(() => {
     for (const id of HIDE_IDS){
       const el = document.getElementById(id);
@@ -287,6 +294,7 @@ function getActiveKey(){
     // ✅ keep Delete Column always visible
     const delBtn = document.getElementById("delColBtn");
     if (delBtn) delBtn.style.display = "";
+    // ✅ DO NOT touch checkBtn here
   }, 800);
 
 })();
@@ -301,6 +309,7 @@ function getActiveKey(){
   RULE:
     - Admin: always visible on all tabs
     - Non-admin: 
+      * Store not loaded: default to HIDE (safer)
       * Global OFF => never see Check anywhere
       * Global ON => see Check only on tabs enabled per-tab (default: all OFF)
   HOOKS:
@@ -316,17 +325,21 @@ function getActiveKey(){
     const checkBtn = document.getElementById("checkBtn");
     if (!checkBtn) return;
 
+    // Get user role first (needed even if store not loaded)
+    const isAdmin = (typeof window.isAdmin === "function") ? window.isAdmin() : false;
+
     // Get store API
     const store = window.DEFS?.CHECK_VISIBILITY;
     if (!store) {
-      // Store not loaded yet, show by default (will be corrected when store loads)
-      checkBtn.style.display = "";
+      // Store not loaded yet: safer default - admin shows, non-admin hides
+      if (isAdmin) {
+        checkBtn.style.display = "";
+      } else {
+        checkBtn.style.display = "none";
+      }
       return;
     }
 
-    // Get user role
-    const isAdmin = (typeof window.isAdmin === "function") ? window.isAdmin() : false;
-    
     // Get companyId
     const companyId = store.getCompanyId();
     
@@ -349,27 +362,50 @@ function getActiveKey(){
     applyCheckButtonVisibility();
     setTimeout(applyCheckButtonVisibility, 50);
     setTimeout(applyCheckButtonVisibility, 300);
+    setTimeout(applyCheckButtonVisibility, 1000); // Extra delay for store to load
   });
 
-  // Hook refreshUI
-  const _refreshUI = window.refreshUI;
-  if (typeof _refreshUI === "function") {
-    window.refreshUI = function(){
-      const ret = _refreshUI.apply(this, arguments);
-      try { applyCheckButtonVisibility(); } catch {}
-      return ret;
-    };
-  }
+  // Hook refreshUI (with __hooked flag to avoid double wrapping)
+  (function hookRefreshUI(){
+    function tryHook(){
+      if (typeof window.refreshUI !== "function") return false;
+      if (window.refreshUI.__checkVisibilityHooked) return true;
 
-  // Hook render
-  const _render = window.render;
-  if (typeof _render === "function") {
-    window.render = function(){
-      const ret = _render.apply(this, arguments);
-      try { applyCheckButtonVisibility(); } catch {}
-      return ret;
-    };
-  }
+      const _orig = window.refreshUI;
+      window.refreshUI = function(){
+        const ret = _orig.apply(this, arguments);
+        try { applyCheckButtonVisibility(); } catch {}
+        return ret;
+      };
+      window.refreshUI.__checkVisibilityHooked = true;
+      return true;
+    }
+    tryHook();
+    setTimeout(tryHook, 0);
+    setTimeout(tryHook, 200);
+    setTimeout(tryHook, 800);
+  })();
+
+  // Hook render (with __hooked flag to avoid double wrapping)
+  (function hookRender(){
+    function tryHook(){
+      if (typeof window.render !== "function") return false;
+      if (window.render.__checkVisibilityHooked) return true;
+
+      const _orig = window.render;
+      window.render = function(){
+        const ret = _orig.apply(this, arguments);
+        try { applyCheckButtonVisibility(); } catch {}
+        return ret;
+      };
+      window.render.__checkVisibilityHooked = true;
+      return true;
+    }
+    tryHook();
+    setTimeout(tryHook, 0);
+    setTimeout(tryHook, 200);
+    setTimeout(tryHook, 800);
+  })();
 
   // Hook setActive
   (function hookSetActive(){
@@ -413,7 +449,7 @@ function getActiveKey(){
     setTimeout(tryHook, 800);
   })();
 
-  // Periodic check (safety net)
+  // Periodic check (safety net) - ensure visibility stays correct
   setInterval(applyCheckButtonVisibility, 1000);
 
 })();
