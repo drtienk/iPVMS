@@ -325,18 +325,11 @@ function getActiveKey(){
     const checkBtn = document.getElementById("checkBtn");
     if (!checkBtn) return;
 
-    // Get user role first (needed even if store not loaded)
-    const isAdmin = (typeof window.isAdmin === "function") ? window.isAdmin() : false;
-
     // Get store API
     const store = window.DEFS?.CHECK_VISIBILITY;
     if (!store) {
-      // Store not loaded yet: safer default - admin shows, non-admin hides
-      if (isAdmin) {
-        checkBtn.style.display = "";
-      } else {
-        checkBtn.style.display = "none";
-      }
+      // Store not loaded yet: default hide to avoid flashing
+      checkBtn.style.display = "none";
       return;
     }
 
@@ -346,7 +339,9 @@ function getActiveKey(){
     // Get current active tab key
     const activeKey = getActiveKey();
     
-    // Check if user can see Check button on current tab (per-tab logic)
+    // ✅ REMOVED: isAdmin bypass - admin and non-admin now have identical visibility
+    // Both roles see Check button only if per-tab setting is enabled
+    const isAdmin = (typeof window.isAdmin === "function") ? window.isAdmin() : false;
     const canSee = store.canUserSeeCheckOnTab(companyId, activeKey, isAdmin);
     
     // Apply visibility
@@ -356,6 +351,9 @@ function getActiveKey(){
       checkBtn.style.display = "none";
     }
   }
+
+  // Expose globally so admin UI can call it after saving
+  window.applyCheckButtonVisibility = applyCheckButtonVisibility;
 
   // DOMContentLoaded
   window.addEventListener("DOMContentLoaded", function(){

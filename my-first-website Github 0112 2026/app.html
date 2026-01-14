@@ -211,6 +211,7 @@ SAFE TO REPLACE WHOLE BLOCK
       </select>
 
       <button type="button" id="sheetAdminBtn" class="btn-dark" style="display:none;">分頁管理</button>
+      <button type="button" id="checkButtonAdminBtn" class="btn-dark" style="display:none;">CheckButton Admin</button>
       <button type="button" id="userAdminBtn" class="btn-violet" style="display:none;">User 管理</button>
       <button type="button" id="logoutBtn" class="btn-danger">登出</button>
     </div>
@@ -352,6 +353,33 @@ SAFE TO REPLACE WHOLE BLOCK
 
 
   <!-- ======================================
+  BLOCK: 27A_UI_MODAL_CHECK_BUTTON_ADMIN
+  AREA: BODY / check button admin modal
+  SAFE TO REPLACE WHOLE BLOCK
+  ====================================== -->
+  <div id="checkButtonAdminModal" class="modal">
+    <div class="modal-card">
+      <div class="modal-head">
+        <div style="font-weight:800;">🔧 Check Button 可見性設定（只影響目前公司）</div>
+        <button type="button" id="checkButtonAdminClose" class="btn-gray">關閉</button>
+      </div>
+
+      <div class="modal-body">
+        <div style="font-weight:800; margin-bottom:8px;">標籤頁設定</div>
+        <div id="checkButtonAdminList" class="admin-list"></div>
+      </div>
+
+      <div class="modal-foot">
+        <button type="button" id="checkButtonAdminAllOn" class="btn-ok">全部啟用</button>
+        <button type="button" id="checkButtonAdminAllOff" class="btn-gray">全部停用</button>
+        <button type="button" id="checkButtonAdminSave">儲存並套用</button>
+      </div>
+    </div>
+  </div>
+  <!-- ========= END BLOCK: 27A_UI_MODAL_CHECK_BUTTON_ADMIN ========= -->
+
+
+  <!-- ======================================
   BLOCK: 28_UI_MODAL_PERIOD_PICKER
   AREA: BODY / period picker modal
   SAFE TO REPLACE WHOLE BLOCK
@@ -489,6 +517,7 @@ SAFE TO REPLACE WHOLE BLOCK
 
 <script src="js/toolbar_ops.js"></script>
 <script src="js/sheet_admin_ui.js"></script>
+<script src="js/check_button_admin_ui.js"></script>
 <script src="js/period_ui.js"></script>
 
 <!-- router/app core -->
@@ -503,6 +532,7 @@ SAFE TO REPLACE WHOLE BLOCK
 
 <script src="js/toolbar_delegate.js"></script>
 <script src="js/sheet_admin_delegate.js"></script>
+<script src="js/check_button_admin_delegate.js"></script>
 <script src="js/user_admin_stub.js"></script>
 
 <script src="js/user_added_col_flag.js"></script>
