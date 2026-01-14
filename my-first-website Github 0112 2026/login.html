@@ -129,6 +129,19 @@
       <button id="confirmCompanyBtn" type="button" style="margin-top:8px; width:100%; padding:8px; background:#10b981; color:#fff; border:0; border-radius:8px; cursor:pointer; font-weight:600;">Confirm</button>
     </div>
 
+    <!-- Admin User Management: 預設隱藏 -->
+    <div id="adminUserManagement" style="display:none; margin-top:20px; padding:12px; border:1px solid #d1d5db; border-radius:8px; background:#f9fafb;">
+      <div style="font-weight:800; margin-bottom:12px;">User List (Admin)</div>
+      <div id="userListContainer" style="margin-bottom:16px;"></div>
+      <div style="border-top:1px solid #d1d5db; padding-top:12px;">
+        <div style="font-weight:600; margin-bottom:8px;">Add User</div>
+        <input id="newUsername" type="text" placeholder="Username" style="width:100%; padding:6px; margin-bottom:6px; box-sizing:border-box;">
+        <input id="newPassword" type="password" placeholder="Password" style="width:100%; padding:6px; margin-bottom:8px; box-sizing:border-box;">
+        <button id="addUserBtn" type="button" style="width:100%; padding:8px; background:#3b82f6; color:#fff; border:0; border-radius:6px; cursor:pointer; font-weight:600;">Add User</button>
+        <p id="userMsg" style="margin-top:8px; color:#ef4444; font-size:13px; min-height:18px;"></p>
+      </div>
+    </div>
+
     <button id="loginBtn" onclick="login()">Next</button>
     <button id="backBtn" onclick="goBack()" style="display:none;">Back</button>
 
@@ -355,6 +368,12 @@
         confirmCompanyBtn.addEventListener("click", confirmUserCompany);
       }
 
+      // Bind add user button
+      const addUserBtn = document.getElementById("addUserBtn");
+      if (addUserBtn) {
+        addUserBtn.addEventListener("click", addNewUser);
+      }
+
       // 焦點
       document.getElementById("username").focus();
 
@@ -538,6 +557,116 @@
       loginBtn.textContent = t.btnLogin;
       backBtn.style.display = "block";
       companySelect.focus();
+
+      // Show and render user management
+      const userManagement = document.getElementById("adminUserManagement");
+      if (userManagement) {
+        userManagement.style.display = "block";
+        renderUserList();
+      }
+    }
+
+    /* =============================
+       渲染使用者列表
+       ============================= */
+    function renderUserList() {
+      const container = document.getElementById("userListContainer");
+      if (!container) return;
+
+      container.innerHTML = "";
+
+      // Create table
+      const table = document.createElement("table");
+      table.style.width = "100%";
+      table.style.borderCollapse = "collapse";
+      table.style.fontSize = "13px";
+
+      // Header row
+      const headerRow = document.createElement("tr");
+      headerRow.style.borderBottom = "2px solid #d1d5db";
+      headerRow.style.backgroundColor = "#f3f4f6";
+      ["Username", "Role", "Company Name"].forEach(text => {
+        const th = document.createElement("th");
+        th.textContent = text;
+        th.style.padding = "8px";
+        th.style.textAlign = "left";
+        headerRow.appendChild(th);
+      });
+      table.appendChild(headerRow);
+
+      // Data rows
+      Object.keys(USER_ACCOUNTS).forEach(username => {
+        const account = USER_ACCOUNTS[username];
+        const userCompany = getUserCompany(username);
+        const companyName = userCompany ? userCompany.companyName : "Not assigned";
+
+        const row = document.createElement("tr");
+        row.style.borderBottom = "1px solid #e5e7eb";
+
+        const usernameCell = document.createElement("td");
+        usernameCell.textContent = username;
+        usernameCell.style.padding = "8px";
+        row.appendChild(usernameCell);
+
+        const roleCell = document.createElement("td");
+        roleCell.textContent = account.role || "user";
+        roleCell.style.padding = "8px";
+        row.appendChild(roleCell);
+
+        const companyCell = document.createElement("td");
+        companyCell.textContent = companyName;
+        companyCell.style.padding = "8px";
+        companyCell.style.color = companyName === "Not assigned" ? "#6b7280" : "#111827";
+        row.appendChild(companyCell);
+
+        table.appendChild(row);
+      });
+
+      container.appendChild(table);
+    }
+
+    /* =============================
+       新增使用者
+       ============================= */
+    function addNewUser() {
+      const usernameInput = document.getElementById("newUsername");
+      const passwordInput = document.getElementById("newPassword");
+      const msgEl = document.getElementById("userMsg");
+
+      if (!usernameInput || !passwordInput || !msgEl) return;
+
+      const username = usernameInput.value.trim();
+      const password = passwordInput.value.trim();
+
+      msgEl.textContent = "";
+
+      // Validate
+      if (!username || !password) {
+        msgEl.textContent = "Username and password are required";
+        return;
+      }
+
+      // Check duplicate
+      if (USER_ACCOUNTS[username]) {
+        msgEl.textContent = "Username already exists";
+        return;
+      }
+
+      // Add to USER_ACCOUNTS
+      USER_ACCOUNTS[username] = {
+        password: password,
+        role: "user"
+      };
+
+      // Clear inputs
+      usernameInput.value = "";
+      passwordInput.value = "";
+
+      // Refresh user list
+      renderUserList();
+
+      msgEl.textContent = `User "${username}" added successfully`;
+      msgEl.style.color = "#10b981";
     }
 
     /* =============================
@@ -759,6 +888,10 @@ return;
       // Hide create company button
       const createBtn = document.getElementById("createCompanyBtn");
       if (createBtn) createBtn.style.display = "none";
+
+      // Hide user management
+      const userManagement = document.getElementById("adminUserManagement");
+      if (userManagement) userManagement.style.display = "none";
 
       usernameInput.disabled = false;
       passwordInput.disabled = false;
