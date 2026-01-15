@@ -4,7 +4,10 @@
   <meta charset="UTF-8">
   <title>Redirect to Login</title>
   <script>
-    location.replace("login.html");
+    // Preserve query string and hash for Supabase invite/verify callbacks
+    const qs = window.location.search || "";
+    const hash = window.location.hash || "";
+    location.replace("login.html" + qs + hash);
   </script>
 </head>
 <body>
