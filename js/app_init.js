@@ -130,6 +130,21 @@ console.log("✅ [19] app_init loaded");
       // safety: ensure first paint
       if (typeof window.render === "function") window.render();
 
+      // ====== 7.5) Try cloud read once (after initial render) ======
+      try {
+        if (!window.__CLOUD_COMPANY_READ_ONCE__) {
+          window.__CLOUD_COMPANY_READ_ONCE__ = true;
+          if (typeof window.cloudModelCompanyTryReadOnce === "function") {
+            // Run asynchronously to not block init
+            setTimeout(() => {
+              window.cloudModelCompanyTryReadOnce?.();
+            }, 100);
+          }
+        }
+      } catch (err) {
+        console.warn("[app_init] cloud read hook error (non-fatal):", err.message);
+      }
+
       // ====== 8) 強制重新綁定 Check 按鈕（確保 click handler 一定接上） ======
       setTimeout(function forceBindCheckButton(){
         // ✅ DISABLED: Check binding handled in custom_rules.js
