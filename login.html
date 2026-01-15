@@ -169,19 +169,21 @@
 
     // === INVITE CALLBACK CATCHER (Supabase Dashboard Invite Fix) ===
     // Detect Supabase invite callback parameters and redirect to set-password.html
-    const searchParams = window.location.search;
-    const hashParams = window.location.hash;
+    (function handleInviteRedirect() {
+      const searchParams = window.location.search;
+      const hashParams = window.location.hash;
 
-    // Check for query param: ?code=...
-    if (searchParams.includes("code=")) {
-      window.location.replace("./set-password.html" + searchParams);
-      return;
-    }
-    // Check for hash params: #access_token=... or #type=invite
-    else if (hashParams && (hashParams.includes("access_token") || hashParams.includes("type=invite"))) {
-      window.location.replace("./set-password.html" + hashParams);
-      return;
-    }
+      // Check for query param: ?code=...
+      if (searchParams.includes("code=")) {
+        window.location.replace("./set-password.html" + searchParams);
+        return;
+      }
+      // Check for hash params: #access_token=... or #type=invite
+      else if (hashParams && (hashParams.includes("access_token") || hashParams.includes("type=invite"))) {
+        window.location.replace("./set-password.html" + hashParams);
+        return;
+      }
+    })();
 
     /*
       ✅ SUPABASE CONFIGURATION REQUIRED:
