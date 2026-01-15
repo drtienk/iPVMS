@@ -1070,7 +1070,16 @@
         const normalizedEmail = rawEmail.toLowerCase().trim();
         const userRole = ADMIN_EMAILS.includes(normalizedEmail) ? "admin" : "user";
 
-        alert("DEBUG LOGIN\nemail = " + rawEmail + "\nnormalized = " + normalizedEmail + "\nrole = " + userRole);
+        const msgEl = document.getElementById("msg");
+        if (msgEl) {
+          msgEl.style.color = "#111827";
+          msgEl.textContent =
+            "DEBUG LOGIN\n" +
+            "email = " + rawEmail + "\n" +
+            "normalized = " + normalizedEmail + "\n" +
+            "role = " + userRole;
+        }
+        console.log("[DEBUG LOGIN]", { rawEmail, normalizedEmail, userRole });
         console.log("[AUTH] session", await sb.auth.getSession());
         console.log("[AUTH] userRole", userRole);
 
