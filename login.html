@@ -165,6 +165,22 @@
     const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5iYWViaGZudmtnY2Fwb3hkZGtxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg0MjQ0MzQsImV4cCI6MjA4NDAwMDQzNH0.xFc5NhCwRApgq_f-hp3pBkJZOz6YHhm8mR67xz9Do6g";
     const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
+    // === INVITE CALLBACK CATCHER (Supabase Dashboard Invite Fix) ===
+    // Detect Supabase invite callback parameters and redirect to set-password.html
+    const searchParams = window.location.search;
+    const hashParams = window.location.hash;
+
+    // Check for query param: ?code=...
+    if (searchParams.includes("code=")) {
+      window.location.replace("./set-password.html" + searchParams);
+      // Stop execution - redirect will happen immediately
+    }
+    // Check for hash params: #access_token=... or #type=invite
+    else if (hashParams && (hashParams.includes("access_token") || hashParams.includes("type=invite"))) {
+      window.location.replace("./set-password.html" + hashParams);
+      // Stop execution - redirect will happen immediately
+    }
+
     /*
       ✅ SUPABASE CONFIGURATION REQUIRED:
       
