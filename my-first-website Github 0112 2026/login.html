@@ -151,9 +151,9 @@
 
     <p id="msg"></p>
 
-    <!-- ✅ Create account link -->
+    <!-- ✅ Invite-only notice (public signup disabled) -->
     <div style="margin-top: 16px; text-align: center;">
-      <a href="./signup.html" style="color: #3b82f6; text-decoration: none; font-size: 14px;">Create account</a>
+      <p style="color: #6b7280; font-size: 13px; margin: 0;">Need an account? Contact admin for an invite.</p>
     </div>
   </div>
 
@@ -164,6 +164,22 @@
     const SUPABASE_URL = "https://nbaebhfnvkgcapoxddkq.supabase.co";
     const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5iYWViaGZudmtnY2Fwb3hkZGtxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg0MjQ0MzQsImV4cCI6MjA4NDAwMDQzNH0.xFc5NhCwRApgq_f-hp3pBkJZOz6YHhm8mR67xz9Do6g";
     const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    /*
+      ✅ SUPABASE CONFIGURATION REQUIRED:
+      
+      In Supabase Dashboard > Authentication > URL Configuration:
+      1. Add to Redirect URLs allowlist:
+         - https://drtienk.github.io/iPVMS/set-password.html
+         - https://drtienk.github.io/iPVMS/login.html
+      
+      2. When inviting users via Dashboard, use redirect_to:
+         https://drtienk.github.io/iPVMS/set-password.html
+    */
+
+    // ✅ Admin emails list (for role detection)
+    // TODO: Replace with your actual admin email(s)
+    const ADMIN_EMAILS = ["<put your admin email here>"];
     // ===== END CHANGE =====
 
     /* =============================
@@ -317,7 +333,7 @@
         docLang: "en",
         title: "Login",
         langLabel: "Language",
-        userLabel: "Username",
+        userLabel: "Email",
         passLabel: "Password",
         companyLabel: "Company (Admin only)",
         companyPlaceholder: "-- Select a company --",
@@ -337,7 +353,7 @@
         docLang: "zh-Hant",
         title: "登入",
         langLabel: "語言",
-        userLabel: "帳號",
+        userLabel: "Email",
         passLabel: "密碼",
         companyLabel: "公司（僅限管理員）",
         companyPlaceholder: "-- 請選擇公司 --",
@@ -1029,11 +1045,10 @@
         sessionStorage.setItem("userEmail", data.user.email || email);
         sessionStorage.setItem("userId", data.user.id || "");
 
-        // ⚠️ TEMPORARY: Get role from legacy local data (for now, until roles are moved to Supabase)
-        // This is a temporary solution - roles should eventually come from Supabase
-        const accounts = getUserAccounts();
-        const account = accounts[email] || null;
-        const userRole = account ? account.role : "user"; // Default to "user" if not found in local data
+        // ✅ Get role from ADMIN_EMAILS list (based on email)
+        const userRole = ADMIN_EMAILS.includes(data.user.email || email) ? "admin" : "user";
+        console.log("[AUTH] session", await supabase.auth.getSession());
+        console.log("[AUTH] userRole", userRole);
 
         // ✅ Continue with existing admin/user flow logic (unchanged)
         // admin 兩段式
