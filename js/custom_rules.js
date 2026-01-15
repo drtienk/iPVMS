@@ -1,0 +1,1869 @@
+console.log("🔥 LOADED custom_rules.js VERSION = 2026-01-13 CHECK-DISPATCH-FIX");
+
+/* =========================================================
+  FILE: custom_rules.js
+  檔案：custom_rules.js
+
+  GOAL:
+    Put all frequently-changed rules here (NOT core engine)
+    將所有「經常需要變動的規則」集中放在此檔案
+    （不包含核心引擎邏輯）
+
+  SECTIONS / 區塊說明:
+    A) Actions / Toolbar visibility
+       A) 動作 / 工具列顯示控制
+
+    B) Activity Center (buttons / required / locks)
+       B) Activity Center（按鈕 / 必填欄位 / 鎖定規則）
+
+    C) Checks (validation rules)
+       C) 檢查（資料驗證規則）
+
+  NOTE / 注意事項:
+    - app.js must be loaded BEFORE this file
+      必須先載入 app.js，再載入本檔案
+
+    - Keep modules grouped so you can find them fast
+      請依功能將模組分組，方便快速查找與維護
+
+========================================================= */
+
+/* =========================================================
+   A) 可靠的 activeMode / activeKey 讀取器
+========================================================= */
+function getActiveMode(){
+  // 依序嘗試：window.activeMode -> 全域 activeMode -> sessionStorage -> fallback 'model'
+  try {
+    if (typeof window.activeMode !== "undefined" && window.activeMode) {
+      return String(window.activeMode).toLowerCase();
+    }
+  } catch {}
+  
+  try {
+    if (typeof activeMode !== "undefined" && activeMode) {
+      return String(activeMode).toLowerCase();
+    }
+  } catch {}
+  
+  try {
+    const stored = sessionStorage.getItem("activeMode");
+    if (stored) return String(stored).toLowerCase();
+  } catch {}
+  
+  return "model";
+}
+
+function getActiveKey(){
+  // 依序嘗試：window.activeKey -> 全域 activeKey -> fallback ''
+  try {
+    if (typeof window.activeKey !== "undefined" && window.activeKey) {
+      return String(window.activeKey).trim();
+    }
+  } catch {}
+  
+  try {
+    if (typeof activeKey !== "undefined" && activeKey) {
+      return String(activeKey).trim();
+    }
+  } catch {}
+  
+  return "";
+}
+
+/* =========================
+   A) Actions dropdown binder
+========================= */
+
+/* =========================================================
+  MODULE: 15B_ACTION_MENU_BINDER
+  AREA: bind Actions dropdown -> trigger existing buttons
+  CHANGE:
+   - Remove Delete Column from Actions dropdown
+  SAFE TO REPLACE WHOLE MODULE
+========================================================= */
+(function bindActionMenu(){
+  // ✅ 使用全域的 $ 函數（從 utils.js 透過 utils_globals.js 暴露）
+  const $ = window.DEFS?.UTILS?.$ || window.$ || ((id) => document.getElementById(id));
+
+  function trigger(id){
+    const el = $(id);
+    if (!el) {
+      console.warn("[Actions] button not found:", id);
+      return;
+    }
+    el.click();
+  }
+
+  const MAP = {
+    export_csv:  "exportCsvBtn",
+    export_xlsx: "exportXlsxBtn",
+    export_json: "exportJsonBtn",
+    import_json: "importJsonBtn",
+    clear_local: "clearLocalBtn",
+    // ✅ delete_col removed
+  };
+
+  function removeDeleteOption(){
+    const menu = $("actionMenu");
+    if (!menu) return;
+    // 移除 value="delete_col"
+    menu.querySelectorAll('option[value="delete_col"]').forEach(opt => opt.remove());
+  }
+
+  function ensureBound(){
+    const menu = $("actionMenu");
+    if (!menu) return;
+
+    if (menu.dataset.bound === "1") return;
+    menu.dataset.bound = "1";
+
+    // ✅ 先移除 delete_col 選項
+    removeDeleteOption();
+
+    menu.addEventListener("change", () => {
+      const v = String(menu.value || "").trim();
+      menu.value = ""; // reset 回 Actions
+      if (!v) return;
+
+      // ✅ 若 value 直接就是按鈕 id（例如 exportCsvBtn）
+      if ($(v)) { trigger(v); return; }
+
+      // ✅ 若 value 是我們的 key（export_csv）
+      const btnId = MAP[v];
+      if (btnId) { trigger(btnId); return; }
+
+      console.warn("[Actions] unknown action value:", v);
+    });
+  }
+
+  window.addEventListener("DOMContentLoaded", ensureBound);
+  setTimeout(ensureBound, 0);
+  setTimeout(ensureBound, 200);
+})();
+ /* ======================= END MODULE: 15B_ACTION_MENU_BINDER ======================= */
+
+
+ /* =========================================================
+  MODULE: 20_PERSIST_ACTIVE_TAB
+  AREA: Persist last active sheet (STORE ONLY; no restore on load)
+  SAFE TO REPLACE WHOLE MODULE
+========================================================= */
+(function persistActiveTabStoreOnly(){
+
+  const KEY_MODEL  = "lastActiveKey_model";
+  const KEY_PERIOD = "lastActiveKey_period";
+
+  function storeKey(mode, key){
+    try{
+      const k = String(key || "").trim();
+      if (!k) return;
+      if (mode === "period") sessionStorage.setItem(KEY_PERIOD, k);
+      else sessionStorage.setItem(KEY_MODEL, k);
+    } catch {}
+  }
+
+  // ✅ Hook setActive：每次切分頁就記住
+  (function hookSetActive(){
+    function tryHook(){
+      if (typeof window.setActive !== "function") return false;
+      if (window.setActive.__persistTabStoreOnlyHooked) return true;
+
+      const _orig = window.setActive;
+      window.setActive = function(nextKey){
+        const ret = _orig.apply(this, arguments);
+        try { storeKey(getActiveMode(), getActiveKey()); } catch {}
+        return ret;
+      };
+      window.setActive.__persistTabStoreOnlyHooked = true;
+      return true;
+    }
+    tryHook(); setTimeout(tryHook,0); setTimeout(tryHook,200); setTimeout(tryHook,800);
+  })();
+
+  // ✅ Hook switchMode：切換模式前也記住
+  (function hookSwitchMode(){
+    function tryHook(){
+      if (typeof window.switchMode !== "function") return false;
+      if (window.switchMode.__persistTabStoreOnlyHooked) return true;
+
+      const _orig = window.switchMode;
+      window.switchMode = function(nextMode){
+        try { storeKey(getActiveMode(), getActiveKey()); } catch {}
+        return _orig.apply(this, arguments);
+      };
+      window.switchMode.__persistTabStoreOnlyHooked = true;
+      return true;
+    }
+    tryHook(); setTimeout(tryHook,0); setTimeout(tryHook,200); setTimeout(tryHook,800);
+  })();
+
+})();
+ /* ======================= END MODULE: 20_PERSIST_ACTIVE_TAB ======================= */
+
+
+
+/* =========================
+   A) Toolbar visibility rules
+========================= */
+
+ /* =========================================================
+  MODULE: 15C_TOOLBAR_VISIBILITY (SIMPLE)
+  AREA: keep toolbar only 3 buttons; others hidden
+        AND: Delete Column ALWAYS visible (never auto-hide)
+  RULE:
+    - delColBtn 永遠顯示
+    - 能不能刪 / 到最小提示 => 交給 toolbar_ops.js 的 click handler 處理
+  SAFE TO REPLACE WHOLE MODULE
+========================================================= */
+// ======================= MODULE 15C_TOOLBAR_VISIBILITY START =======================
+(function toolbarVisibilityGuard(){
+
+  // ✅ REMOVED "checkBtn" from KEEP_VISIBLE - Check button visibility is controlled by MODULE 15D
+  const KEEP_VISIBLE = new Set(["addRowBtn","addColBtn","delColBtn"]);
+  const HIDE_IDS = [
+    "exportCsvBtn",
+    "exportXlsxBtn",
+    "exportJsonBtn",
+    "importJsonBtn",
+    "clearLocalBtn",
+    "importJsonFile"
+  ];
+
+  function hideEl(id){
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.style.display = "none";
+    el.dataset.__forceHidden = "1";
+  }
+
+  function showEl(id){
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.style.display = "";
+  }
+
+  function applyToolbarVisibility(){
+    // hide the ones you don't want
+    HIDE_IDS.forEach(hideEl);
+
+    // show the ones you keep (NOT including checkBtn - that's handled by MODULE 15D)
+    KEEP_VISIBLE.forEach(showEl);
+
+    // ✅ 再保險：永遠顯示 delColBtn（不要再被藏）
+    const delBtn = document.getElementById("delColBtn");
+    if (delBtn) delBtn.style.display = "";
+    
+    // ✅ DO NOT touch checkBtn - let MODULE 15D handle it
+  }
+
+  window.addEventListener("DOMContentLoaded", () => {
+    applyToolbarVisibility();
+    setTimeout(applyToolbarVisibility, 50);
+    setTimeout(applyToolbarVisibility, 300);
+  });
+
+  // Hook refreshUI/render: keep buttons visible even after UI refresh
+  // ✅ Use __hooked flag to avoid double wrapping
+  const _refreshUI = window.refreshUI;
+  if (typeof _refreshUI === "function" && !window.refreshUI.__toolbarVisibilityHooked) {
+    window.refreshUI = function(){
+      const ret = _refreshUI.apply(this, arguments);
+      try { applyToolbarVisibility(); } catch {}
+      return ret;
+    };
+    window.refreshUI.__toolbarVisibilityHooked = true;
+  }
+
+  const _render = window.render;
+  if (typeof _render === "function" && !window.render.__toolbarVisibilityHooked) {
+    window.render = function(){
+      const ret = _render.apply(this, arguments);
+      try { applyToolbarVisibility(); } catch {}
+      return ret;
+    };
+    window.render.__toolbarVisibilityHooked = true;
+  }
+
+  // ✅ still keep other buttons hidden, but NEVER hide delColBtn
+  // ✅ DO NOT touch checkBtn in interval - let MODULE 15D handle it
+  setInterval(() => {
+    for (const id of HIDE_IDS){
+      const el = document.getElementById(id);
+      if (el && el.style.display !== "none") hideEl(id);
+    }
+    // ✅ keep Delete Column always visible
+    const delBtn = document.getElementById("delColBtn");
+    if (delBtn) delBtn.style.display = "";
+    // ✅ DO NOT touch checkBtn here
+  }, 800);
+
+})();
+// ======================= MODULE 15C_TOOLBAR_VISIBILITY END =======================
+
+
+/* =========================================================
+  MODULE: 15D_CHECK_BUTTON_VISIBILITY
+  AREA: Control Check button visibility based on user role and company settings (global + per-tab)
+  SAFE TO REPLACE WHOLE MODULE
+  
+  RULE:
+    - Admin: always visible on all tabs
+    - Non-admin: 
+      * Store not loaded: default to HIDE (safer)
+      * Global OFF => never see Check anywhere
+      * Global ON => see Check only on tabs enabled per-tab (default: all OFF)
+  HOOKS:
+    - DOMContentLoaded
+    - refreshUI
+    - render
+    - setActive
+    - switchMode
+========================================================= */
+(function checkButtonVisibilityControl(){
+  
+  function applyCheckButtonVisibility(){
+    const checkBtn = document.getElementById("checkBtn");
+    if (!checkBtn) return;
+
+    // Get store API
+    const store = window.DEFS?.CHECK_VISIBILITY;
+    if (!store) {
+      // Store not loaded yet: default hide to avoid flashing
+      checkBtn.style.display = "none";
+      return;
+    }
+
+    // Get companyId
+    const companyId = store.getCompanyId();
+    
+    // Get current active tab key
+    const activeKey = getActiveKey();
+    
+    // ✅ REMOVED: isAdmin bypass - admin and non-admin now have identical visibility
+    // Both roles see Check button only if per-tab setting is enabled
+    const isAdmin = (typeof window.isAdmin === "function") ? window.isAdmin() : false;
+    const canSee = store.canUserSeeCheckOnTab(companyId, activeKey, isAdmin);
+    
+    // Apply visibility
+    if (canSee) {
+      checkBtn.style.display = "";
+    } else {
+      checkBtn.style.display = "none";
+    }
+  }
+
+  // Expose globally so admin UI can call it after saving
+  window.applyCheckButtonVisibility = applyCheckButtonVisibility;
+
+  // DOMContentLoaded
+  window.addEventListener("DOMContentLoaded", function(){
+    applyCheckButtonVisibility();
+    setTimeout(applyCheckButtonVisibility, 50);
+    setTimeout(applyCheckButtonVisibility, 300);
+    setTimeout(applyCheckButtonVisibility, 1000); // Extra delay for store to load
+  });
+
+  // Hook refreshUI (with __hooked flag to avoid double wrapping)
+  (function hookRefreshUI(){
+    function tryHook(){
+      if (typeof window.refreshUI !== "function") return false;
+      if (window.refreshUI.__checkVisibilityHooked) return true;
+
+      const _orig = window.refreshUI;
+      window.refreshUI = function(){
+        const ret = _orig.apply(this, arguments);
+        try { applyCheckButtonVisibility(); } catch {}
+        return ret;
+      };
+      window.refreshUI.__checkVisibilityHooked = true;
+      return true;
+    }
+    tryHook();
+    setTimeout(tryHook, 0);
+    setTimeout(tryHook, 200);
+    setTimeout(tryHook, 800);
+  })();
+
+  // Hook render (with __hooked flag to avoid double wrapping)
+  (function hookRender(){
+    function tryHook(){
+      if (typeof window.render !== "function") return false;
+      if (window.render.__checkVisibilityHooked) return true;
+
+      const _orig = window.render;
+      window.render = function(){
+        const ret = _orig.apply(this, arguments);
+        try { applyCheckButtonVisibility(); } catch {}
+        return ret;
+      };
+      window.render.__checkVisibilityHooked = true;
+      return true;
+    }
+    tryHook();
+    setTimeout(tryHook, 0);
+    setTimeout(tryHook, 200);
+    setTimeout(tryHook, 800);
+  })();
+
+  // Hook setActive
+  (function hookSetActive(){
+    function tryHook(){
+      if (typeof window.setActive !== "function") return false;
+      if (window.setActive.__checkVisibilityHooked) return true;
+
+      const _orig = window.setActive;
+      window.setActive = function(nextKey){
+        const ret = _orig.apply(this, arguments);
+        try { applyCheckButtonVisibility(); } catch {}
+        return ret;
+      };
+      window.setActive.__checkVisibilityHooked = true;
+      return true;
+    }
+    tryHook();
+    setTimeout(tryHook, 0);
+    setTimeout(tryHook, 200);
+    setTimeout(tryHook, 800);
+  })();
+
+  // Hook switchMode
+  (function hookSwitchMode(){
+    function tryHook(){
+      if (typeof window.switchMode !== "function") return false;
+      if (window.switchMode.__checkVisibilityHooked) return true;
+
+      const _orig = window.switchMode;
+      window.switchMode = function(nextMode){
+        const ret = _orig.apply(this, arguments);
+        try { applyCheckButtonVisibility(); } catch {}
+        return ret;
+      };
+      window.switchMode.__checkVisibilityHooked = true;
+      return true;
+    }
+    tryHook();
+    setTimeout(tryHook, 0);
+    setTimeout(tryHook, 200);
+    setTimeout(tryHook, 800);
+  })();
+
+  // Periodic check (safety net) - ensure visibility stays correct
+  setInterval(applyCheckButtonVisibility, 1000);
+
+})();
+/* ======================= END MODULE: 15D_CHECK_BUTTON_VISIBILITY ======================= */
+
+
+  /* =========================================================
+  MODULE: 12I_AC_CODE_N_BUTTONS (ALLOCATION-LEFT + EN LABEL)
+  AREA: Model > Activity Center (key: ac)
+  FEATURE:
+    - Add/Remove Activity Center Code n + Description n columns
+    - Insert BEFORE "Allocation" column (to the left of Allocation)
+    - Code4 is always to the right of Code3 (and still left of Allocation)
+    - Buttons injected into toolbar (next to Add Column)
+  SAFE TO REPLACE WHOLE MODULE
+========================================================= */
+(function acCodeNButtons_AllocLeft(){
+
+  const TARGET_MODE = "model";
+  const TARGET_KEY  = "ac";
+
+  function isTarget(){ return getActiveMode() === TARGET_MODE && getActiveKey() === TARGET_KEY; }
+
+  function norm(s){ return String(s || "").replace(/\s+/g, " ").trim(); }
+
+  function getSheet(){
+    try { return (typeof activeSheet === "function") ? activeSheet() : null; } catch { return null; }
+  }
+
+  function ensureUI(){
+    let wrap = document.getElementById("acCodeNBar");
+    if (wrap) return wrap;
+
+    const toolbar = document.querySelector(".toolbar");
+    if (!toolbar) return null;
+
+    wrap = document.createElement("span");
+    wrap.id = "acCodeNBar";
+    wrap.style.gap = "8px";
+    wrap.style.alignItems = "center";
+    wrap.style.flexWrap = "wrap";
+    wrap.style.marginLeft = "8px";
+    wrap.style.display = "inline-flex";
+
+    // ✅ English labels
+    wrap.innerHTML = `
+      <button type="button" id="btnAddAcCodeN" class="btn-ok" style="padding:6px 10px;">Add Activity Center Code n</button>
+      <button type="button" id="btnDelAcCodeN" class="btn-danger" style="padding:6px 10px;">Remove Activity Center Code n</button>
+    `;
+
+    const addColBtn = document.getElementById("addColBtn");
+    if (addColBtn && addColBtn.parentElement === toolbar) {
+      addColBtn.insertAdjacentElement("afterend", wrap);
+    } else {
+      toolbar.appendChild(wrap);
+    }
+
+    wrap.querySelector("#btnAddAcCodeN")?.addEventListener("click", addNextPair);
+    wrap.querySelector("#btnDelAcCodeN")?.addEventListener("click", removeLastPair);
+
+    return wrap;
+  }
+
+  function showHideUI(){
+    const wrap = ensureUI();
+    if (!wrap) return;
+    wrap.style.display = isTarget() ? "inline-flex" : "none";
+  }
+
+  function parseCodeNHeader(h){
+    const t = norm(h);
+    const m = t.match(/^Activity\s*Center\s*Code\s*(\d+)$/i);
+    return m ? Number(m[1]) : null;
+  }
+  function parseDescNHeader(h){
+    const t = norm(h);
+    const m = t.match(/^Description\s*(\d+)$/i);
+    return m ? Number(m[1]) : null;
+  }
+
+  function getMaxN(headers){
+    let max = 2;
+    (headers || []).forEach(h => {
+      const n1 = parseCodeNHeader(h);
+      const n2 = parseDescNHeader(h);
+      if (Number.isFinite(n1)) max = Math.max(max, n1);
+      if (Number.isFinite(n2)) max = Math.max(max, n2);
+    });
+    return max;
+  }
+
+  function findAllocationIndex(headers){
+    const idx = (headers || []).findIndex(h => norm(h).toLowerCase() === "allocation");
+    return (idx >= 0) ? idx : (headers ? headers.length : 0);
+  }
+
+  function addNextPair(){
+    if (!isTarget()) return;
+    const s = getSheet(); if (!s) return;
+
+    if (!Array.isArray(s.headers)) s.headers = [];
+    if (!Array.isArray(s.data)) s.data = [];
+
+    const nextN = getMaxN(s.headers) + 1;
+
+    const codeH = `Activity Center Code ${nextN}`;
+    const descH = `Description ${nextN}`;
+
+    // ✅ insert BEFORE Allocation
+    const insertAt = findAllocationIndex(s.headers);
+
+    // ensure each row has cols length
+    for (let r=0; r<s.data.length; r++){
+      if (!Array.isArray(s.data[r])) s.data[r] = [];
+      while (s.data[r].length < s.cols) s.data[r].push("");
+    }
+
+    s.headers.splice(insertAt, 0, codeH, descH);
+    for (let r=0; r<s.data.length; r++){
+      s.data[r].splice(insertAt, 0, "", "");
+    }
+
+    s.cols = Number(s.cols || 0) + 2;
+
+    if (typeof render === "function") render();
+    if (typeof saveToLocalByMode === "function") saveToLocalByMode(getActiveMode());
+  }
+
+  function removeLastPair(){
+    if (!isTarget()) return;
+    const s = getSheet(); if (!s) return;
+    if (!Array.isArray(s.headers)) return;
+
+    const maxN = getMaxN(s.headers);
+    if (maxN < 3) return;
+
+    const codeH = `Activity Center Code ${maxN}`;
+    const descH = `Description ${maxN}`;
+
+    const iCode = s.headers.findIndex(h => norm(h).toLowerCase() === norm(codeH).toLowerCase());
+    const iDesc = s.headers.findIndex(h => norm(h).toLowerCase() === norm(descH).toLowerCase());
+    const idxs = [iCode, iDesc].filter(i => i >= 0).sort((a,b)=>a-b);
+    if (idxs.length !== 2) return;
+
+    for (let k=idxs.length-1; k>=0; k--){
+      const idx = idxs[k];
+      s.headers.splice(idx, 1);
+      if (Array.isArray(s.data)){
+        for (let r=0; r<s.data.length; r++){
+          if (Array.isArray(s.data[r])) s.data[r].splice(idx, 1);
+        }
+      }
+      s.cols = Math.max(1, Number(s.cols || 0) - 1);
+    }
+
+    if (typeof render === "function") render();
+    if (typeof saveToLocalByMode === "function") saveToLocalByMode(getActiveMode());
+  }
+
+  function tryHook(fnName){
+    const fn = window[fnName];
+    if (typeof fn !== "function" || fn.__acCodeNAllocLeftHooked) return false;
+
+    window[fnName] = function(){
+      const ret = fn.apply(this, arguments);
+      try { showHideUI(); } catch {}
+      return ret;
+    };
+    window[fnName].__acCodeNAllocLeftHooked = true;
+    return true;
+  }
+
+  function boot(){
+    ensureUI();
+    showHideUI();
+    ["render","refreshUI","setActive","switchMode","setLang","applyLangUI"].forEach(tryHook);
+  }
+
+  window.addEventListener("DOMContentLoaded", boot);
+  setTimeout(boot, 0);
+  setTimeout(boot, 200);
+  setTimeout(boot, 800);
+  setTimeout(boot, 1500);
+
+  setInterval(() => {
+    try { ensureUI(); showHideUI(); } catch {}
+  }, 600);
+
+})();
+  /* ======================= END  MODULE: 12I_AC_CODE_N_BUTTONS (ALLOCATION-LEFT + EN LABEL)======================= */
+
+
+/* =========================
+   B) Activity Center rules
+========================= */
+
+
+  /* =========================================================
+  MODULE: 12H_AC_REQUIRED_AND_CELL_LOCK  (UPDATED)
+  AREA: Model > Activity Center (key: ac)
+  CHANGE (this update):
+   - Required columns (BU / Code1 / Allocation): apply req-col tint on header + ALL rows
+   - Missing red outline (req-missing): ONLY on Row 1 (r===0)
+   - Keep Code1/Code2 mutual lock
+  SAFE TO REPLACE WHOLE MODULE
+========================================================= */
+(function acRequiredAndCellLock(){
+
+  const TARGET_MODE = "model";
+  const TARGET_KEY  = "ac";
+
+  // required columns (by header name)
+  const REQUIRED_HEADERS = new Set([
+    "Business Unit",
+    "Activity Center Code 1",
+    "Allocation"
+  ]);
+
+  // tag so we only clear what this module adds
+  const TAG_REQ = "ac-req";
+
+  function norm(s){ return String(s||"").replace(/\s+/g," ").trim(); }
+
+  function isTarget(){
+    return getActiveMode() === TARGET_MODE && getActiveKey() === TARGET_KEY;
+  }
+
+  function getSheet(){
+    try { return (typeof activeSheet === "function") ? activeSheet() : null; }
+    catch { return null; }
+  }
+
+  function ensureStyleOnce(){
+    if (document.getElementById("acLockStyle")) return;
+    const st = document.createElement("style");
+    st.id = "acLockStyle";
+    st.textContent = `
+      td.cell-disabled{
+        background:#f3f4f6 !important;
+        color:#9ca3af !important;
+        cursor:not-allowed !important;
+      }
+    `;
+    document.head.appendChild(st);
+  }
+
+  function findColIndexByHeader(sheet, headerName){
+    const h = norm(headerName);
+    const headers = Array.isArray(sheet?.headers) ? sheet.headers : [];
+    for (let i=0; i<headers.length; i++){
+      if (norm(headers[i]) === h) return i;
+    }
+    return -1;
+  }
+
+  // fallback indices based on your current layout
+  function getIndexes(sheet){
+    return {
+      bu:  Math.max(findColIndexByHeader(sheet,"Business Unit"), 0),
+      c1:  Math.max(findColIndexByHeader(sheet,"Activity Center Code 1"), 1),
+      c2:  Math.max(findColIndexByHeader(sheet,"Activity Center Code 2"), 3),
+      all: Math.max(findColIndexByHeader(sheet,"Allocation"), 5),
+    };
+  }
+
+  function clearMyReqMarks(){
+    const head = document.getElementById("gridHead");
+    const body = document.getElementById("gridBody");
+    head?.querySelectorAll(`th.${TAG_REQ}`).forEach(el => el.classList.remove("req-col", TAG_REQ));
+    body?.querySelectorAll(`td.${TAG_REQ}`).forEach(el => el.classList.remove("req-col", TAG_REQ));
+    body?.querySelectorAll(`td.ac-miss`).forEach(td => td.classList.remove("req-missing","ac-miss"));
+  }
+
+  /* =========================
+     Required column tint:
+     - header + ALL rows add req-col
+     Missing:
+     - ONLY Row 1 (r===0) gets req-missing if blank
+  ========================== */
+  function applyRequiredMarks(sheet, idx){
+    const head = document.getElementById("gridHead");
+    const body = document.getElementById("gridBody");
+    if (!head || !body) return;
+
+    // clear only mine first (do not remove others)
+    head.querySelectorAll(`th.${TAG_REQ}`).forEach(el => el.classList.remove("req-col", TAG_REQ));
+    body.querySelectorAll(`td.${TAG_REQ}`).forEach(el => el.classList.remove("req-col", TAG_REQ));
+    body.querySelectorAll(`td.ac-miss`).forEach(td => td.classList.remove("req-missing","ac-miss"));
+
+    // header row is default header => first <tr>, and th index offset +1 due to corner
+    const tr = head.querySelector("tr");
+    if (tr){
+      [idx.bu, idx.c1, idx.all].forEach(c => {
+        const th = tr.children?.[c + 1];
+        if (th){
+          th.classList.add("req-col", TAG_REQ);
+        }
+      });
+    }
+
+    // ALL rows: tint required columns
+    [idx.bu, idx.c1, idx.all].forEach(c => {
+      body.querySelectorAll(`td[data-c="${c}"]`).forEach(td => {
+        td.classList.add("req-col", TAG_REQ);
+      });
+    });
+
+    // ONLY row 1: missing red outline if blank
+    const r = 0;
+    [idx.bu, idx.c1, idx.all].forEach(c => {
+      const td = body.querySelector(`td[data-r="${r}"][data-c="${c}"]`);
+      if (!td) return;
+      const v = String(td.textContent || "").trim();
+      if (v === "") td.classList.add("req-missing","ac-miss");
+    });
+  }
+
+  /* =========================
+     Mutual lock Code1 / Code2
+  ========================== */
+  function tdAt(r,c){
+    const body = document.getElementById("gridBody");
+    return body?.querySelector(`td[data-r="${r}"][data-c="${c}"]`) || null;
+  }
+
+  function setDisabled(td, disabled){
+    if (!td) return;
+    if (disabled){
+      td.classList.add("cell-disabled");
+      td.contentEditable = "false";
+    } else {
+      td.classList.remove("cell-disabled");
+      td.contentEditable = "true";
+    }
+  }
+
+  function applyRowLock(r, idx){
+    const tdC1 = tdAt(r, idx.c1);
+    const tdC2 = tdAt(r, idx.c2);
+    if (!tdC1 || !tdC2) return;
+
+    const v1 = String(tdC1.textContent || "").trim();
+    const v2 = String(tdC2.textContent || "").trim();
+
+    if (v1 && !v2){
+      setDisabled(tdC2, true);
+      setDisabled(tdC1, false);
+    } else if (v2 && !v1){
+      setDisabled(tdC1, true);
+      setDisabled(tdC2, false);
+    } else {
+      setDisabled(tdC1, false);
+      setDisabled(tdC2, false);
+    }
+  }
+
+  function applyAll(){
+    if (!isTarget()){
+      clearMyReqMarks();
+      return;
+    }
+    const sheet = getSheet();
+    if (!sheet) return;
+
+    ensureStyleOnce();
+
+    const idx = getIndexes(sheet);
+    applyRequiredMarks(sheet, idx);
+
+    const rows = Number(sheet.rows || 0);
+    for (let r=0; r<rows; r++){
+      applyRowLock(r, idx);
+    }
+  }
+
+  // live update on input
+  document.addEventListener("input", () => {
+    requestAnimationFrame(() => {
+      try { applyAll(); } catch {}
+    });
+  }, true);
+
+  window.addEventListener("DOMContentLoaded", () => {
+    setTimeout(() => { try { applyAll(); } catch {} }, 0);
+    setTimeout(() => { try { applyAll(); } catch {} }, 200);
+  });
+
+  // Hook render (so column tint stays after re-render)
+  (function hookRender(){
+    function tryHook(){
+      if (typeof window.render !== "function") return false;
+      if (window.render.__acReqLockHooked) return true;
+
+      const _orig = window.render;
+      window.render = function(){
+        const ret = _orig.apply(this, arguments);
+        try { applyAll(); } catch {}
+        return ret;
+      };
+      window.render.__acReqLockHooked = true;
+      return true;
+    }
+    tryHook(); setTimeout(tryHook, 0); setTimeout(tryHook, 200); setTimeout(tryHook, 800);
+  })();
+
+})();
+
+ /* ======================= END  MODULE: 12H_AC_REQUIRED_AND_CELL_LOCK  (UPDATED)======================= */
+
+
+ 
+ /* =========================
+   C) Checks / Validation rules
+========================= */
+
+/* =========================================================
+  MODULE: 15A_CHECKS
+  AREA: per-sheet validation checks (per-tab memory + auto hide/show)
+  CHANGE:
+   - Model > Activity Center (ac) checks: Rules 1–13 (multi-error list + jump)
+  SAFE TO REPLACE WHOLE MODULE
+========================================================= */
+
+/* ========== UI helpers ========== */
+function _statusKey(mode, key){ return `${mode}|${key}`; }
+const CHECK_STATUS_STORE = {}; // { "model|company": {type,title,msg}, ... }
+
+function setCheckStatusForCurrentSheet(type, title, msg){
+  const mode = getActiveMode();
+  const key = getActiveKey();
+  const k = _statusKey(mode, key);
+  CHECK_STATUS_STORE[k] = { type: type||"ok", title: title||"Check", msg: msg||"" };
+  applyCheckStatusVisibility();
+}
+
+function clearCheckStatusForCurrentSheet(){
+  const mode = getActiveMode();
+  const key = getActiveKey();
+  const k = _statusKey(mode, key);
+  delete CHECK_STATUS_STORE[k];
+  applyCheckStatusVisibility();
+}
+
+function applyCheckStatusVisibility(){
+  // ✅ 先檢查 app.html 是否已有 checkStatus DOM
+  let box = document.getElementById("checkStatus");
+  let tEl = document.getElementById("checkStatusTitle");
+  let mEl = document.getElementById("checkStatusMsg");
+  
+  // ✅ 如果 app.html 已有，就不建立新的
+  if (box && tEl && mEl) {
+    // 使用現有的 DOM
+  } else {
+    // ✅ 只有在真的不存在時才建立（避免重複建立）
+    if (!box) {
+      // 再次確認是否真的不存在（避免 race condition）
+      box = document.getElementById("checkStatus");
+      if (!box) {
+        const toolbar = document.querySelector(".toolbar");
+        const parent = toolbar ? toolbar.parentElement : document.body;
+        const insertBefore = toolbar || document.body.firstChild;
+        
+        box = document.createElement("div");
+        box.id = "checkStatus";
+        box.className = "panel";
+        box.style.display = "none";
+        box.style.marginTop = "10px";
+        box.style.padding = "12px";
+        box.style.border = "2px solid";
+        box.style.borderRadius = "6px";
+        
+        const innerDiv = document.createElement("div");
+        innerDiv.style.display = "flex";
+        innerDiv.style.justifyContent = "space-between";
+        innerDiv.style.alignItems = "flex-start";
+        innerDiv.style.gap = "10px";
+        
+        const contentDiv = document.createElement("div");
+        
+        if (!tEl) {
+          tEl = document.createElement("div");
+          tEl.id = "checkStatusTitle";
+          tEl.style.fontWeight = "800";
+          tEl.style.marginBottom = "6px";
+          contentDiv.appendChild(tEl);
+        }
+        
+        if (!mEl) {
+          mEl = document.createElement("div");
+          mEl.id = "checkStatusMsg";
+          mEl.style.whiteSpace = "pre-wrap";
+          mEl.style.lineHeight = "1.7";
+          contentDiv.appendChild(mEl);
+        }
+        
+        innerDiv.appendChild(contentDiv);
+        
+        const closeBtn = document.getElementById("checkStatusClose");
+        if (!closeBtn) {
+          const btn = document.createElement("button");
+          btn.type = "button";
+          btn.id = "checkStatusClose";
+          btn.className = "btn-gray";
+          btn.style.padding = "6px 10px";
+          btn.textContent = (typeof lang !== "undefined" && lang === "en") ? "Close" : "關閉";
+          btn.addEventListener("click", clearCheckStatusForCurrentSheet);
+          innerDiv.appendChild(btn);
+        } else {
+          innerDiv.appendChild(closeBtn);
+        }
+        
+        box.appendChild(innerDiv);
+        
+        if (insertBefore && parent) {
+          parent.insertBefore(box, insertBefore);
+        } else {
+          document.body.insertBefore(box, document.body.firstChild);
+        }
+        
+        // 重新取得元素
+        box = document.getElementById("checkStatus");
+        tEl = document.getElementById("checkStatusTitle");
+        mEl = document.getElementById("checkStatusMsg");
+      }
+    }
+  }
+  
+  // 如果還是找不到，直接返回
+  if (!box || !tEl || !mEl) {
+    console.warn("Failed to create/find checkStatus elements");
+    return;
+  }
+
+  const mode = getActiveMode();
+  const key = getActiveKey();
+  const k = _statusKey(mode, key);
+  const item = CHECK_STATUS_STORE[k];
+
+  if (!item){
+    box.style.display = "none";
+    return;
+  }
+
+  // ✅ 顯示狀態框
+  box.style.display = "block";
+  tEl.textContent = item.title || "Check";
+  mEl.textContent = item.msg || "";
+
+  // ✅ 根據類型設定顏色（綠色=成功，黃色=警告，紅色=錯誤）
+  const type = item.type || "ok";
+  if (type === "ok") {
+    box.style.borderColor = "#86efac"; // 綠色邊框
+    box.style.background = "#f0fdf4";  // 淺綠色背景
+    box.style.color = "#166534";       // 深綠色文字
+  } else if (type === "warn") {
+    box.style.borderColor = "#f59e0b"; // 黃色邊框
+    box.style.background = "#fffbeb";  // 淺黃色背景
+    box.style.color = "#92400e";       // 深黃色文字
+  } else {
+    box.style.borderColor = "#ef4444"; // 紅色邊框
+    box.style.background = "#fee2e2";  // 淺紅色背景
+    box.style.color = "#991b1b";       // 深紅色文字
+  }
+  
+  // ✅ 確保結果區塊可見（強制顯示）
+  box.style.visibility = "visible";
+  box.style.opacity = "1";
+  
+  // ✅ 滾動到結果區塊（確保使用者能看到）
+  try {
+    box.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  } catch(e) {
+    try {
+      const rect = box.getBoundingClientRect();
+      if (rect.top < 0 || rect.bottom > window.innerHeight) {
+        window.scrollTo({ top: box.offsetTop - 20, behavior: "smooth" });
+      }
+    } catch(e2) {}
+  }
+}
+
+// ✅ 綁定關閉按鈕（如果存在）
+(function bindCloseButton(){
+  function tryBind(){
+    const closeBtn = document.getElementById("checkStatusClose");
+    if (!closeBtn) return false;
+    if (closeBtn.__closeBound) return true;
+    closeBtn.__closeBound = true;
+    closeBtn.addEventListener("click", clearCheckStatusForCurrentSheet);
+    return true;
+  }
+  tryBind();
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", tryBind);
+  }
+  setTimeout(tryBind, 0);
+  setTimeout(tryBind, 200);
+})();
+
+/* ========== small helpers ========== */
+function _normHeader(x){
+  return String(x||"").replace(/\s+/g," ").trim();
+}
+function _findColIndexByHeader(sheetKey, headerName){
+  const s = sheets?.[sheetKey];
+  if (!s) return -1;
+  const target = _normHeader(headerName);
+  const headers = Array.isArray(s.headers) ? s.headers : [];
+  for (let i=0; i<headers.length; i++){
+    if (_normHeader(headers[i]) === target) return i;
+  }
+  return -1;
+}
+function _collectUniqueColValues(sheetKey, colIdx){
+  const s = sheets?.[sheetKey];
+  if (!s || colIdx < 0) return new Set();
+  ensureSize(s);
+
+  const out = new Set();
+  const rows = Number(s.rows || 0);
+  for (let r=0; r<rows; r++){
+    const v = String(s.data?.[r]?.[colIdx] ?? "").trim();
+    if (v) out.add(v); // ✅ case-sensitive
+  }
+  return out;
+}
+function _isParenOnlyText(v){
+  const t = String(v || "").trim();
+  return /^\(.*\)$/.test(t);
+}
+
+/* ✅ Code parser for Rule 11–13 */
+function _parseCode(code){
+  const t = String(code || "").trim();
+  const m = t.match(/^([A-Za-z])(\d{3})$/);
+  if (!m) return null;
+  return {
+    raw: t,
+    letter: m[1],                // keep case-sensitive
+    num3: Number(m[2]),           // 100 / 110 / 120 ...
+    prefix2: t.slice(0, 2)        // e.g., "D1" (Rule 11/12)
+  };
+}
+
+/* ✅ 跳到指定 cell（如需導引） */
+function gotoCell(target){
+  if (!target) return;
+
+  const needMode = target.mode || getActiveMode();
+  const needKey  = target.key  || getActiveKey();
+
+  if (needMode !== getActiveMode() && typeof switchMode === "function") switchMode(needMode);
+  else if (typeof refreshUI === "function") refreshUI();
+
+  requestAnimationFrame(() => {
+    if (typeof setActive === "function") setActive(needKey);
+    requestAnimationFrame(() => {
+      if (typeof focusCell === "function") focusCell(Number(target.r||0), Number(target.c||0));
+    });
+  });
+}
+
+/* =========================================================
+   ✅ CHECK RULES - 只使用 window.CHECKS_BY_SHEET（單一來源）
+========================================================= */
+
+// ✅ 初始化 window.CHECKS_BY_SHEET（只初始化一次）
+if (typeof window.CHECKS_BY_SHEET === "undefined") {
+  window.CHECKS_BY_SHEET = {};
+}
+
+// ✅ 註冊 company 規則
+window.CHECKS_BY_SHEET.company = function checkCompanySheet(){
+  const mode = getActiveMode();
+  if (mode !== "model") {
+    return { ok:true, type:"warn", msg: (typeof lang !== "undefined" && lang === "en" ? "Skipped (Period mode)." : "略過（Period 模式不檢查）。") };
+  }
+
+  const sysName = String(documentMeta?.companyName || "").trim();
+  if (!sysName) {
+    return {
+      ok:false, type:"err",
+      msg: (typeof lang !== "undefined" && lang === "en"
+        ? "System Company Name is empty. (No companyName from login/sessionStorage)"
+        : "系統指定的公司名稱是空的（登入沒有帶 companyName 或 sessionStorage 沒有值）。"
+      ),
+      goto: { mode:"model", key:"company", r:0, c:0 }
+    };
+  }
+
+  const a1 = String(sheets?.company?.data?.[0]?.[0] ?? "").trim();
+  if (a1 !== sysName) {
+    return {
+      ok:false, type:"warn",
+      msg: (typeof lang !== "undefined" && lang === "en"
+        ? `Company Name mismatch!\nSystem: ${sysName}\nA1: ${a1 || "(empty)"}\n\nPlease correct Model > Company > A1.`
+        : `公司名稱不一致！\n系統指定：${sysName}\nA1：${a1 || "（空白）"}\n\n請修正 Model > Company > A1。`
+      ),
+      goto: { mode:"model", key:"company", r:0, c:0 }
+    };
+  }
+
+  return { ok:true, type:"ok", msg: (typeof lang !== "undefined" && lang === "en" ? "Company sheet check passed." : "Company 分頁檢查通過。") };
+};
+
+// ✅ 註冊 ac 規則
+window.CHECKS_BY_SHEET.ac = function checkModelActivityCenter(){
+  const mode = getActiveMode();
+  if (mode !== "model") {
+    return { ok:true, type:"warn", msg: (typeof lang !== "undefined" && lang === "en" ? "Skipped (Period mode)." : "略過（Period 模式不檢查）。") };
+  }
+
+  const sAC  = sheets?.ac;
+  const sBU  = sheets?.bu;
+  const sDAF = sheets?.daf;
+
+  if (!sAC || !sBU || !sDAF) {
+    return {
+      ok:false, type:"err",
+      msg: (typeof lang !== "undefined" && lang === "en"
+        ? "Missing required sheets: ac / bu / daf."
+        : "缺少必要分頁：ac / bu / daf。"
+      )
+    };
+  }
+
+  ensureSize(sAC);
+  ensureSize(sBU);
+  ensureSize(sDAF);
+
+  // ---- column indexes (header-first, fallback to fixed) ----
+  const idxBU_ac = (_findColIndexByHeader("ac","Business Unit") >= 0) ? _findColIndexByHeader("ac","Business Unit") : 0;
+  const idxC1_ac = (_findColIndexByHeader("ac","Activity Center Code 1") >= 0) ? _findColIndexByHeader("ac","Activity Center Code 1") : 1;
+  const idxC2_ac = (_findColIndexByHeader("ac","Activity Center Code 2") >= 0) ? _findColIndexByHeader("ac","Activity Center Code 2") : 3;
+  const idxAlloc = (_findColIndexByHeader("ac","Allocation") >= 0) ? _findColIndexByHeader("ac","Allocation") : 5;
+
+  const idxBU_bu = (_findColIndexByHeader("bu","Business Unit") >= 0) ? _findColIndexByHeader("bu","Business Unit") : 0;
+  const idxDAFDriver = (_findColIndexByHeader("daf","Driver Name or Allocation") >= 0) ? _findColIndexByHeader("daf","Driver Name or Allocation") : 1;
+
+  // ---- sets ----
+  const buSet  = _collectUniqueColValues("bu", idxBU_bu);          // case-sensitive
+  const dafSet = _collectUniqueColValues("daf", idxDAFDriver);     // case-sensitive
+
+  function acVal(r,c){
+    const v = String(sAC.data?.[r]?.[c] ?? "").trim();
+    // ✅ Rule 6: any "(...)" means "ignore / skip checks" => treat as blank
+    if (_isParenOnlyText(v)) return "";
+    return v;
+  }
+
+  const errors = []; // {r,c,msg}
+
+  const rowsAC = Number(sAC.rows || 0);
+
+  // Rule 2: first row must have any info
+  (function ruleFirstRowHasInfo(){
+    const row = sAC.data?.[0] || [];
+    const any = row.some(v => String(v ?? "").trim() !== "");
+    if (!any){
+      errors.push({
+        r:0, c:0,
+        msg: (typeof lang !== "undefined" && lang === "en"
+          ? "Rule 2: Row 1 must contain some information (cannot be completely empty)."
+          : "規則 2：第一列一定要有資訊（不能整列空白）。"
+        )
+      });
+    }
+  })();
+
+  // collect code arrays
+  const code1Arr = new Array(rowsAC).fill("");
+  const code2Arr = new Array(rowsAC).fill("");
+
+  // trackers for duplicates
+  const code1Seen = new Map(); // value -> first row
+  const code2Seen = new Map(); // value -> first row
+  const code1Set = new Set();
+  const code2Set = new Set();
+
+  // For Rule 11/12/13
+  let lastParentCode1 = "";          // nearest previous non-empty code1 (raw)
+  let lastParentParsed = null;       // parsed parent
+  let lastChildParsed = null;        // for continuity within same parent
+
+  // For Code1 order (Rule 13)
+  let prevCode1Parsed = null;
+  let prevCode1Row = -1;
+
+  // For Code2 continuity (Rule 13)
+  let prevCode2Parsed = null;
+  let prevCode2Row = -1;
+  let prevCode2ParentPrefix2 = "";   // reset when parent changes
+
+  // Pass: per-row checks + duplicate tracking + hierarchy/order
+  for (let r=0; r<rowsAC; r++){
+    const bu    = acVal(r, idxBU_ac);
+    const code1 = acVal(r, idxC1_ac);
+    const code2 = acVal(r, idxC2_ac);
+    const alloc = acVal(r, idxAlloc);
+
+    code1Arr[r] = code1;
+    code2Arr[r] = code2;
+
+    const hasCode = (code1 !== "" || code2 !== "");
+
+    // Rule 7: if code1 or code2 has value => BU required
+    if (hasCode && bu === ""){
+      errors.push({
+        r, c: idxBU_ac,
+        msg: (typeof lang !== "undefined" && lang === "en"
+          ? `Rule 7: Row ${r+1} requires Business Unit when Code 1/2 has value. (Code1="${code1}", Code2="${code2}")`
+          : `規則 7：第 ${r+1} 列只要 Code 1/2 有值，就必須填 Business Unit。（Code1="${code1}", Code2="${code2}"）`
+        )
+        });
+    }
+
+    // Rule 1: if BU filled => must exist in BU sheet (case-sensitive)
+    if (bu !== "" && !buSet.has(bu)){
+      errors.push({
+        r, c: idxBU_ac,
+        msg: (typeof lang !== "undefined" && lang === "en"
+          ? `Rule 1: Row ${r+1} Business Unit "${bu}" is not in Model > Business Unit (case-sensitive). Example: "abc" ≠ "ABC".`
+          : `規則 1：第 ${r+1} 列 Business Unit「${bu}」不在 Model > Business Unit 清單中（大小寫需完全一致）。例：「abc」≠「ABC」。`
+        )
+        });
+    }
+
+    // Rule 3: if Code1 has value => Code2 must be blank (same row)
+    if (code1 !== "" && code2 !== ""){
+      errors.push({
+        r, c: idxC2_ac,
+        msg: (typeof lang !== "undefined" && lang === "en"
+          ? `Rule 3: Row ${r+1} Code 2 must be blank when Code 1 has value. (Code1="${code1}", Code2="${code2}")`
+          : `規則 3：第 ${r+1} 列只要 Code 1 有值，Code 2 必須為空白。（Code1="${code1}", Code2="${code2}"）`
+        )
+        });
+    }
+
+    // Rule 4 & 5: Allocation must exist in DAF set, unless "(...)" then ignore
+    if (alloc !== "" && !_isParenOnlyText(alloc)){
+      if (!dafSet.has(alloc)){
+        errors.push({
+          r, c: idxAlloc,
+          msg: (typeof lang !== "undefined" && lang === "en"
+            ? `Rule 4: Row ${r+1} Allocation "${alloc}" not found in Model > Driver and Allocation Formula > "Driver Name or Allocation" (case-sensitive).`
+            : `規則 4：第 ${r+1} 列 Allocation「${alloc}」不在 Model > Driver and Allocation Formula 分頁的「Driver Name or Allocation」清單中（大小寫需完全一致）。`
+          )
+          });
+      }
+    }
+
+    // Rule 8: Code1 duplicates (ignore blank)
+    if (code1 !== ""){
+      if (code1Seen.has(code1)){
+        const firstR = code1Seen.get(code1);
+        errors.push({
+          r, c: idxC1_ac,
+          msg: (typeof lang !== "undefined" && lang === "en"
+            ? `Rule 8: Code 1 duplicate "${code1}" at Row ${r+1} (first seen at Row ${firstR+1}).`
+            : `規則 8：Code 1「${code1}」重複：第 ${r+1} 列（第一次出現在第 ${firstR+1} 列）。`
+          )
+          });
+      } else {
+        code1Seen.set(code1, r);
+      }
+      code1Set.add(code1);
+    }
+
+    // Rule 9: Code2 duplicates (ignore blank)
+    if (code2 !== ""){
+      if (code2Seen.has(code2)){
+        const firstR = code2Seen.get(code2);
+        errors.push({
+          r, c: idxC2_ac,
+          msg: (typeof lang !== "undefined" && lang === "en"
+            ? `Rule 9: Code 2 duplicate "${code2}" at Row ${r+1} (first seen at Row ${firstR+1}).`
+            : `規則 9：Code 2「${code2}」重複：第 ${r+1} 列（第一次出現在第 ${firstR+1} 列）。`
+          )
+          });
+      } else {
+        code2Seen.set(code2, r);
+      }
+      code2Set.add(code2);
+    }
+
+    // ============================
+    // Rule 11/12: parent-child prefix2
+    // ============================
+    if (code1 !== ""){
+      // update parent
+      lastParentCode1 = code1;
+      lastParentParsed = _parseCode(code1);
+      lastChildParsed = null; // new parent resets child continuity base
+    } else {
+      // code1 blank, if code2 has value, it must match parent prefix2
+      if (code2 !== ""){
+        const child = _parseCode(code2);
+        if (!lastParentParsed){
+          errors.push({
+            r, c: idxC2_ac,
+            msg: (typeof lang !== "undefined" && lang === "en"
+              ? `Rule 11/12: Row ${r+1} has Code 2 "${code2}" but there is no previous Code 1 as parent.`
+              : `規則 11/12：第 ${r+1} 列 Code 2「${code2}」有值，但上方找不到上一個 Code 1 作為父層。`
+            )
+            });
+        } else if (!child){
+          errors.push({
+            r, c: idxC2_ac,
+            msg: (typeof lang !== "undefined" && lang === "en"
+              ? `Rule 11/12: Row ${r+1} Code 2 "${code2}" format invalid. Expected like D110 (Letter + 3 digits).`
+              : `規則 11/12：第 ${r+1} 列 Code 2「${code2}」格式不正確，需像 D110（英文 + 3 位數字）。`
+            )
+            });
+        } else {
+          // prefix2 must match parent prefix2 (case-sensitive)
+          if (child.prefix2 !== lastParentParsed.prefix2){
+            errors.push({
+              r, c: idxC2_ac,
+              msg: (typeof lang !== "undefined" && lang === "en"
+                ? `Rule 11/12: Row ${r+1} Code 2 "${code2}" must belong to parent Code 1 "${lastParentCode1}" (prefix2 must match: "${lastParentParsed.prefix2}").`
+                : `規則 11/12：第 ${r+1} 列 Code 2「${code2}」必須屬於父層 Code 1「${lastParentCode1}」（前兩碼需相同：${lastParentParsed.prefix2}）。`
+              )
+              });
+          }
+        }
+      }
+    }
+
+    // ============================
+    // Rule 13 (part 1): Code1 logical order across non-empty Code1 rows
+    // - consecutive letters (A->B->C...)
+    // - same num3 (100 stays 100)
+    // ============================
+    if (code1 !== ""){
+      const cur = _parseCode(code1);
+      if (!cur){
+        errors.push({
+          r, c: idxC1_ac,
+          msg: (typeof lang !== "undefined" && lang === "en"
+            ? `Rule 13: Row ${r+1} Code 1 "${code1}" format invalid. Expected like A100 (Letter + 3 digits).`
+            : `規則 13：第 ${r+1} 列 Code 1「${code1}」格式不正確，需像 A100（英文 + 3 位數字）。`
+          )
+          });
+      } else if (prevCode1Parsed){
+        const expectLetter = String.fromCharCode(prevCode1Parsed.letter.charCodeAt(0) + 1);
+        const sameNum = (cur.num3 === prevCode1Parsed.num3);
+        const letterOk = (cur.letter === expectLetter);
+
+        if (!(sameNum && letterOk)){
+          errors.push({
+            r, c: idxC1_ac,
+            msg: (typeof lang !== "undefined" && lang === "en"
+              ? `Rule 13: Code 1 order broken at Row ${r+1}. Expected "${expectLetter}${String(prevCode1Parsed.num3).padStart(3,"0")}" after Row ${prevCode1Row+1} (${prevCode1Parsed.raw}), but got "${code1}".`
+              : `規則 13：Code 1 連續順序錯誤：第 ${r+1} 列。上一個 Code 1 在第 ${prevCode1Row+1} 列為「${prevCode1Parsed.raw}」，理論上下一個應為「${expectLetter}${String(prevCode1Parsed.num3).padStart(3,"0")}」，但目前是「${code1}」。`
+            )
+            });
+        }
+      }
+      prevCode1Parsed = cur;
+      prevCode1Row = r;
+
+      // new parent => reset Code2 continuity expectation group
+      prevCode2Parsed = null;
+      prevCode2Row = -1;
+      prevCode2ParentPrefix2 = cur ? cur.prefix2 : "";
+    }
+
+    // ============================
+    // Rule 13 (part 2): Code2 continuity under same parent
+    // - only check when code2 exists
+    // - must share parent's prefix2 (already checked by rule 11/12 for blank code1 rows)
+    // - consecutive by +10 (D110->D120->D130...)
+    // ============================
+    if (code2 !== ""){
+      const cur2 = _parseCode(code2);
+      // If invalid format, also flag as Rule13 (format) to be explicit
+      if (!cur2){
+        errors.push({
+          r, c: idxC2_ac,
+          msg: (typeof lang !== "undefined" && lang === "en"
+            ? `Rule 13: Row ${r+1} Code 2 "${code2}" format invalid. Expected like D110 (Letter + 3 digits).`
+            : `規則 13：第 ${r+1} 列 Code 2「${code2}」格式不正確，需像 D110（英文 + 3 位數字）。`
+          )
+          });
+      } else {
+        // Determine current parent prefix2 (nearest previous Code1 parsed)
+        const parentPrefix2 = lastParentParsed ? lastParentParsed.prefix2 : "";
+
+        // If we have previous code2 within SAME parent prefix2, enforce +10 continuity
+        if (prevCode2Parsed && prevCode2ParentPrefix2 === parentPrefix2 && parentPrefix2){
+          // must share prefix2 with previous (also implies same parent)
+          const samePrefix2 = (cur2.prefix2 === prevCode2Parsed.prefix2) && (cur2.prefix2 === parentPrefix2);
+          const diff = cur2.num3 - prevCode2Parsed.num3;
+
+          if (!(samePrefix2 && diff === 10)){
+            errors.push({
+              r, c: idxC2_ac,
+              msg: (typeof lang !== "undefined" && lang === "en"
+                ? `Rule 13: Code 2 sequence broken at Row ${r+1}. Expected +10 after Row ${prevCode2Row+1} (${prevCode2Parsed.raw}) under parent prefix "${parentPrefix2}", but got "${code2}".`
+                : `規則 13：Code 2 連續順序錯誤：第 ${r+1} 列。上一個 Code 2 在第 ${prevCode2Row+1} 列為「${prevCode2Parsed.raw}」，同一父層（前兩碼 ${parentPrefix2}）下應該 +10 連續，但目前是「${code2}」。`
+              )
+              });
+          }
+        }
+
+        // update prevCode2 trackers (only when have parent prefix2)
+        prevCode2Parsed = cur2;
+        prevCode2Row = r;
+        prevCode2ParentPrefix2 = parentPrefix2 || cur2.prefix2;
+      }
+    }
+  } // end for rows
+
+  // Rule 10: cross-column conflict (same value appears in BOTH columns anywhere)
+  const conflicts = [];
+  code1Set.forEach(v => { if (code2Set.has(v)) conflicts.push(v); });
+  if (conflicts.length){
+    const conflictSet = new Set(conflicts);
+    for (let r=0; r<rowsAC; r++){
+      const v1 = code1Arr[r];
+      const v2 = code2Arr[r];
+
+      if (v1 && conflictSet.has(v1)){
+        errors.push({
+          r, c: idxC1_ac,
+          msg: (typeof lang !== "undefined" && lang === "en"
+            ? `Rule 10: "${v1}" appears in BOTH Code 1 and Code 2 columns (cross-column conflict).`
+            : `規則 10：「${v1}」同時出現在 Code 1 與 Code 2 欄位（跨欄重複，錯誤）。`
+          )
+          });
+      }
+      if (v2 && conflictSet.has(v2)){
+        errors.push({
+          r, c: idxC2_ac,
+          msg: (typeof lang !== "undefined" && lang === "en"
+            ? `Rule 10: "${v2}" appears in BOTH Code 1 and Code 2 columns (cross-column conflict).`
+            : `規則 10：「${v2}」同時出現在 Code 1 與 Code 2 欄位（跨欄重複，錯誤）。`
+          )
+          });
+      }
+    }
+  }
+
+  // ---- if errors -> list all + jump to first ----
+  if (errors.length){
+    const lines = [];
+    lines.push(typeof lang !== "undefined" && lang === "en"
+      ? `❌ Found ${errors.length} error(s) in Model > Activity Center:`
+      : `❌ Model > Activity Center 共找到 ${errors.length} 個錯誤：`
+    );
+    errors.forEach((e, i) => lines.push(`${i+1}. ${e.msg}`));
+
+    const first = errors[0];
+    return {
+      ok:false,
+      type:"err",
+      msg: lines.join("\n"),
+      goto: { mode:"model", key:"ac", r:first.r, c:first.c }
+    };
+  }
+
+  return {
+    ok:true,
+    type:"ok",
+    msg: (typeof lang !== "undefined" && lang === "en"
+      ? "✅ Activity Center check passed."
+      : "✅ Activity Center 分頁檢查通過。"
+    )
+  };
+};
+
+// ✅ 註冊 nc 規則（永遠是 function，delegate 到 window.DEFS.CHECKS.normalCapacity）
+window.CHECKS_BY_SHEET.nc = function checkNormalCapacityDelegate(){
+  const fn = window.DEFS?.CHECKS?.normalCapacity;
+  if (typeof fn !== "function") {
+    return {
+      ok:false,
+      type:"err",
+      msg:(typeof lang !== "undefined" && lang === "en"
+        ? "Normal Capacity rule not loaded: window.DEFS.CHECKS.normalCapacity"
+        : "Normal Capacity 規則尚未載入：window.DEFS.CHECKS.normalCapacity"
+      )
+    };
+  }
+  return fn();
+};
+
+// ✅ 註冊 nmc 規則
+window.CHECKS_BY_SHEET.nmc = function checkNoMoreCapacitySheet(){
+  const mode = getActiveMode();
+  if (mode !== "model") {
+    return { ok:true, type:"warn", msg: (typeof lang !== "undefined" && lang === "en" ? "Skipped (Period mode)." : "略過（Period 模式不檢查）。") };
+  }
+
+  const s = sheets?.nmc;
+  if (!s) {
+    return {
+      ok:false, type:"err",
+      msg: (typeof lang !== "undefined" && lang === "en" ? "No More Capacity sheet not found." : "找不到 No More Capacity 分頁。")
+    };
+  }
+
+  // ✅ 基本檢查：至少要有資料
+  ensureSize(s);
+  
+  return {
+    ok:true, type:"ok",
+    msg: (typeof lang !== "undefined" && lang === "en" ? "✅ Check passed. No More Capacity sheet is valid." : "✅ 檢查通過。No More Capacity 分頁有效。")
+  };
+};
+
+/* ✅ 主入口：只跑「目前分頁 activeKey」的規則 */
+function runChecksForActiveSheet(){
+  const mode = getActiveMode();
+  const key = getActiveKey();
+  
+  // ✅ 如果 key 是空字串，顯示錯誤並引導
+  if (!key || key.trim() === "") {
+    console.error("❌ [CHECK] activeKey 取得失敗，請檢查 Console");
+    setCheckStatusForCurrentSheet(
+      "err",
+      "Check",
+      (typeof lang !== "undefined" && lang === "en"
+        ? "activeKey retrieval failed. Please check Console for details."
+        : "activeKey 取得失敗，請檢查 Console 查看詳細資訊。")
+    );
+    return;
+  }
+  
+  // ✅ 單一註冊來源：使用 window.CHECKS_BY_SHEET 作為唯一來源
+  const REG = window.CHECKS_BY_SHEET || {};
+  
+  // ✅ 從註冊表查找規則函數
+  let ruleFn = REG[key];
+  const hasRule = typeof ruleFn === "function";
+  const ruleType = hasRule ? typeof ruleFn : "undefined";
+  
+  console.log("✅ [CHECK] dispatch", { mode, key, hasRule, ruleType });
+  
+  // ✅ 如果找不到規則，顯示錯誤
+  if (!hasRule) {
+    setCheckStatusForCurrentSheet(
+      "warn",
+      "Check",
+      (typeof lang !== "undefined" && lang === "en"
+        ? `No check rules for this sheet: ${key}`
+        : `此分頁尚未設定檢查規則：${key}`)
+    );
+    return;
+  }
+
+  // ✅ 執行規則函數
+  console.log("✅ [CHECK] call rule", typeof ruleFn);
+  const res = ruleFn();
+  console.log("✅ [CHECK] result", res);
+
+  // ✅ 處理檢查結果並顯示 UI
+  if (!res || res.ok) {
+    // 檢查通過：顯示綠色成功訊息
+    setCheckStatusForCurrentSheet(
+      res?.type || "ok",
+      "Check",
+      res?.msg || (typeof lang !== "undefined" && lang === "en" ? "✅ Check passed." : "✅ 檢查通過。")
+    );
+    return;
+  }
+
+  // 檢查失敗：顯示紅色錯誤訊息
+  setCheckStatusForCurrentSheet(
+    res.type || "err",
+    "Check",
+    res.msg || (typeof lang !== "undefined" && lang === "en" ? "⚠️ Check failed." : "⚠️ 檢查未通過。")
+  );
+
+  // 如果有指定跳轉位置，跳轉到第一個錯誤
+  if (res.goto && typeof gotoCell === "function") {
+    gotoCell(res.goto);
+  }
+}
+
+// ✅ 暴露到全域，確保 app_init.js 可以存取
+window.runChecksForActiveSheet = runChecksForActiveSheet;
+
+// ✅ 綁定 Check 按鈕（避免重複綁定/事件失效）
+(function bindCheckButton(){
+  function tryBind(){
+    // 確保 checkBtn 存在
+    const checkBtn = document.getElementById("checkBtn");
+    if (!checkBtn) return false;
+    
+    // 避免重複綁定
+    if (checkBtn.__checkBound) return true;
+    checkBtn.__checkBound = true;
+    
+    // ✅ 直接使用 addEventListener（不依賴 on()）
+    checkBtn.addEventListener("click", function(){
+      const mode = getActiveMode();
+      const key = getActiveKey();
+      console.log("✅ [CHECK] click", { mode, key });
+      runChecksForActiveSheet();
+    });
+    
+    return true;
+  }
+  
+  // 立即嘗試
+  if (tryBind()) return;
+  
+  // 如果失敗，延遲重試
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", function(){
+      setTimeout(tryBind, 0);
+      setTimeout(tryBind, 100);
+      setTimeout(tryBind, 300);
+    });
+  } else {
+    setTimeout(tryBind, 0);
+    setTimeout(tryBind, 100);
+    setTimeout(tryBind, 300);
+  }
+})();
+
+/* =========================================================
+   ✅ 切換分頁時自動「隱藏/顯示」
+========================================================= */
+(function hookTabSwitchToStatus(){
+  function tryHook(){
+    if (typeof window.setActive !== "function") return false;
+
+    if (window.setActive.__checkHooked) return true;
+    const _orig = window.setActive;
+
+    window.setActive = function(nextKey){
+      const ret = _orig.apply(this, arguments);
+      try { applyCheckStatusVisibility(); } catch {}
+      return ret;
+    };
+    window.setActive.__checkHooked = true;
+
+    try { applyCheckStatusVisibility(); } catch {}
+    return true;
+  }
+
+  tryHook();
+  setTimeout(tryHook, 0);
+  setTimeout(tryHook, 200);
+  setTimeout(tryHook, 800);
+})();
+
+/* ======================= END MODULE: 15A_CHECKS ======================= */
+
+/* =========================================================
+  MODULE: 12J_NC_REQUIRED_ROW1_ONLY
+  AREA: Model > Normal Capacity (key: nc)
+  GOAL:
+    - 3 columns are required: Activity Code / Activity Name / Description
+    - req-col tint on header + ALL rows
+    - req-missing red outline ONLY on Row 1 (r===0)
+  SAFE TO REPLACE WHOLE MODULE
+========================================================= */
+(function ncRequiredRow1Only(){
+
+  const TARGET_MODE = "model";
+  const TARGET_KEY  = "nc";
+
+  // ✅ 拆成兩個清單：
+  // TINT_HEADERS: 套用 req-col 橘色標記（header + ALL rows）
+  // MISSING_HEADERS: 套用 req-missing 紅框（ONLY Row 1，Description 是 optional 所以不包含）
+  const TINT_HEADERS = [
+    "Activity Code",
+    "Activity Name",
+    "Description"
+  ];
+  const MISSING_HEADERS = [
+    "Activity Code",
+    "Activity Name"
+  ];
+
+  const TAG_REQ = "nc-req"; // tag so we only touch our own marks
+
+  function norm(s){ return String(s||"").replace(/\s+/g," ").trim(); }
+
+  function isTarget(){
+    try {
+      return getActiveMode() === TARGET_MODE && getActiveKey() === TARGET_KEY;
+    } catch { return false; }
+  }
+
+  function getSheet(){
+    try { return (typeof activeSheet === "function") ? activeSheet() : null; }
+    catch { return null; }
+  }
+
+  function findColIndexByHeader(sheet, headerName){
+    const target = norm(headerName);
+    const headers = Array.isArray(sheet?.headers) ? sheet.headers : [];
+    for (let i=0; i<headers.length; i++){
+      if (norm(headers[i]) === target) return i;
+    }
+    return -1;
+  }
+
+  function clearMyMarks(){
+    const head = document.getElementById("gridHead");
+    const body = document.getElementById("gridBody");
+    head?.querySelectorAll(`th.${TAG_REQ}`).forEach(el => el.classList.remove("req-col", TAG_REQ));
+    body?.querySelectorAll(`td.${TAG_REQ}`).forEach(el => el.classList.remove("req-col", TAG_REQ));
+    body?.querySelectorAll(`td.nc-miss`).forEach(td => td.classList.remove("req-missing","nc-miss"));
+  }
+
+  function applyMarks(){
+    if (!isTarget()){
+      clearMyMarks();
+      return;
+    }
+
+    const sheet = getSheet();
+    if (!sheet) return;
+
+    const head = document.getElementById("gridHead");
+    const body = document.getElementById("gridBody");
+    if (!head || !body) return;
+
+    // ✅ resolve tint col indexes (for req-col 橘色標記)
+    const tintCols = [];
+    for (const h of TINT_HEADERS){
+      const idx = findColIndexByHeader(sheet, h);
+      if (idx >= 0) tintCols.push(idx);
+    }
+
+    // ✅ resolve missing col indexes (for req-missing 紅框，不包含 Description)
+    const missingCols = [];
+    for (const h of MISSING_HEADERS){
+      const idx = findColIndexByHeader(sheet, h);
+      if (idx >= 0) missingCols.push(idx);
+    }
+
+    if (!tintCols.length) return;
+
+    // clear only ours first
+    head.querySelectorAll(`th.${TAG_REQ}`).forEach(el => el.classList.remove("req-col", TAG_REQ));
+    body.querySelectorAll(`td.${TAG_REQ}`).forEach(el => el.classList.remove("req-col", TAG_REQ));
+    body.querySelectorAll(`td.nc-miss`).forEach(td => td.classList.remove("req-missing","nc-miss"));
+
+    // ✅ header: th index offset +1 (corner cell) - 使用 TINT_HEADERS
+    const tr = head.querySelector("tr");
+    if (tr){
+      tintCols.forEach(c => {
+        const th = tr.children?.[c + 1];
+        if (th) th.classList.add("req-col", TAG_REQ);
+      });
+    }
+
+    // ✅ ALL rows: tint required columns - 使用 TINT_HEADERS（包含 Description）
+    tintCols.forEach(c => {
+      body.querySelectorAll(`td[data-c="${c}"]`).forEach(td => {
+        td.classList.add("req-col", TAG_REQ);
+      });
+    });
+
+    // ✅ ONLY Row 1 (r===0): red outline if blank - 使用 MISSING_HEADERS（不包含 Description）
+    const r = 0;
+    missingCols.forEach(c => {
+      const td = body.querySelector(`td[data-r="${r}"][data-c="${c}"]`);
+      if (!td) return;
+      const v = String(td.textContent || "").trim();
+      if (v === "") td.classList.add("req-missing","nc-miss");
+    });
+  }
+
+  function boot(){
+    try { applyMarks(); } catch {}
+  }
+
+  // live update
+  document.addEventListener("input", () => {
+    requestAnimationFrame(() => { try { applyMarks(); } catch {} });
+  }, true);
+
+  window.addEventListener("DOMContentLoaded", () => {
+    setTimeout(boot, 0);
+    setTimeout(boot, 200);
+  });
+
+  // keep after rerender/tab/mode changes
+  (function hook(name){
+    function tryHook(){
+      const fn = window[name];
+      if (typeof fn !== "function" || fn[`__ncReqHooked_${name}`]) return false;
+      window[name] = function(){
+        const ret = fn.apply(this, arguments);
+        try { applyMarks(); } catch {}
+        return ret;
+      };
+      window[name][`__ncReqHooked_${name}`] = true;
+      return true;
+    }
+    tryHook(); setTimeout(tryHook,0); setTimeout(tryHook,200); setTimeout(tryHook,800);
+  })("render");
+
+  ["refreshUI","setActive","switchMode"].forEach(n => {
+    (function hook2(name){
+      function tryHook(){
+        const fn = window[name];
+        if (typeof fn !== "function" || fn[`__ncReqHooked_${name}`]) return false;
+        window[name] = function(){
+          const ret = fn.apply(this, arguments);
+          try { applyMarks(); } catch {}
+          return ret;
+        };
+        window[name][`__ncReqHooked_${name}`] = true;
+        return true;
+      }
+      tryHook(); setTimeout(tryHook,0); setTimeout(tryHook,200); setTimeout(tryHook,800);
+    })(n);
+  });
+
+})();
+ /* ======================= END MODULE: 12J_NC_REQUIRED_ROW1_ONLY ======================= */
