@@ -3,6 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <title>Login</title>
+  <!-- VERSION: 2026-01-15-LOGIN-1 -->
 
   <!-- ✅ Supabase JS SDK (CDN) - Required for authentication -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -163,7 +164,8 @@
     // ===== START CHANGE =====
     const SUPABASE_URL = "https://nbaebhfnvkgcapoxddkq.supabase.co";
     const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5iYWViaGZudmtnY2Fwb3hkZGtxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg0MjQ0MzQsImV4cCI6MjA4NDAwMDQzNH0.xFc5NhCwRApgq_f-hp3pBkJZOz6YHhm8mR67xz9Do6g";
-    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    console.log("[LOGIN] loaded v2026-01-15-LOGIN-1");
 
     // === INVITE CALLBACK CATCHER (Supabase Dashboard Invite Fix) ===
     // Detect Supabase invite callback parameters and redirect to set-password.html
@@ -173,12 +175,12 @@
     // Check for query param: ?code=...
     if (searchParams.includes("code=")) {
       window.location.replace("./set-password.html" + searchParams);
-      // Stop execution - redirect will happen immediately
+      return;
     }
     // Check for hash params: #access_token=... or #type=invite
     else if (hashParams && (hashParams.includes("access_token") || hashParams.includes("type=invite"))) {
       window.location.replace("./set-password.html" + hashParams);
-      // Stop execution - redirect will happen immediately
+      return;
     }
 
     /*
@@ -1037,7 +1039,7 @@
 
       // ✅ NEW: Use Supabase Auth for authentication
       try {
-        const { data, error } = await supabase.auth.signInWithPassword({
+        const { data, error } = await sb.auth.signInWithPassword({
           email: email,
           password: password
         });
@@ -1063,7 +1065,7 @@
 
         // ✅ Get role from ADMIN_EMAILS list (based on email)
         const userRole = ADMIN_EMAILS.includes(data.user.email || email) ? "admin" : "user";
-        console.log("[AUTH] session", await supabase.auth.getSession());
+        console.log("[AUTH] session", await sb.auth.getSession());
         console.log("[AUTH] userRole", userRole);
 
         // ✅ Continue with existing admin/user flow logic (unchanged)
