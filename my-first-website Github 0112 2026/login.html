@@ -4,6 +4,9 @@
   <meta charset="UTF-8">
   <title>Login</title>
 
+  <!-- ✅ Supabase JS SDK (CDN) -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
   <style>
     body {
       font-family: system-ui, -apple-system, "Segoe UI", "Noto Sans TC", Arial, sans-serif;
@@ -150,6 +153,13 @@
   </div>
 
   <script>
+    /* =============================
+       ✅ Supabase Client 初始化
+       ============================= */
+    const SUPABASE_URL = "https://nbaebhfnvkgcapoxddkq.supabase.co";
+    const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5iYWViaGZudmtnY2Fwb3hkZGtxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg0MjQ0MzQsImV4cCI6MjA4NDAwMDQzNH0.xFc5NhCwRApgq_f-hp3pBkJZOz6YHhm8mR67xz9Do6g";
+    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
     /* =============================
        帳號資料（前端假資料）
        ============================= */
@@ -955,72 +965,95 @@
     /* =============================
        登入主流程（保留你原本兩段式）
        ============================= */
-    function login() {
-      const u = document.getElementById("username").value.trim();
-      const p = document.getElementById("password").value.trim();
+    async function login() {
+      const email = document.getElementById("username").value.trim(); // ✅ 將 username 當作 email 使用
+      const password = document.getElementById("password").value.trim();
       const c = document.getElementById("company").value;
       const msgEl = document.getElementById("msg");
       const t = I18N[getLang()] || I18N.en;
 
       msgEl.textContent = "";
 
-      const accounts = getUserAccounts();
-      const account = accounts[u];
-      if (!account || account.password !== p) {
+      // ✅ 驗證 email/password 是否為空
+      if (!email || !password) {
         msgEl.textContent = t.msgBadCred;
         return;
       }
 
-      // admin 兩段式
-      if (account.role === "admin") {
-        if (!isAdminVerified) {
-          isAdminVerified = true;
-          showCompanyDropdown();
-          msgEl.textContent = t.msgPickCompany;
+      // ✅ 使用 Supabase 進行登入驗證
+      try {
+        const { data, error } = await supabase.auth.signInWithPassword({
+          email: email,
+          password: password
+        });
+
+        if (error) {
+          // 登入失敗：顯示錯誤訊息
+          alert(error.message || "登入失敗，請檢查帳號密碼");
+          msgEl.textContent = t.msgBadCred;
           return;
         }
 
-        if (c === "") {
-          msgEl.textContent = t.msgPickCompany;
-          return;
-        }
+        // ✅ 登入成功：將用戶資訊寫入 sessionStorage
+        console.log("✅ [Supabase Login] Success:", { email: data.user.email, userId: data.user.id });
+        sessionStorage.setItem("loggedIn", "yes");
+        sessionStorage.setItem("userEmail", data.user.email || email);
+        sessionStorage.setItem("userId", data.user.id || "");
 
-                sessionStorage.setItem("loggedIn", "yes");
+        // ✅ 從本地帳號資料獲取 role（用 email 當作 username 查詢）
+        const accounts = getUserAccounts();
+        const account = accounts[email] || null;
+        const userRole = account ? account.role : "user"; // 預設為 user
+
+        // ✅ 後續流程：根據 role 處理 admin/user 登入流程
+        if (userRole === "admin") {
+          if (!isAdminVerified) {
+            isAdminVerified = true;
+            showCompanyDropdown();
+            msgEl.textContent = t.msgPickCompany;
+            return;
+          }
+
+          if (c === "") {
+            msgEl.textContent = t.msgPickCompany;
+            return;
+          }
+
           sessionStorage.setItem("role", "admin");
-
-          // ✅ admin 也用「統一格式」存公司
           sessionStorage.setItem("companyId", COMPANY_ID_MAP[c] || c);
           sessionStorage.setItem("companyName", c);
-
           window.location.href = "./app.html";
-return;
-
-      }
-
-      // user 登入流程
-      if (account.role === "user") {
-        const userCompany = getUserCompany(u);
-        
-        // 如果沒有綁定公司，顯示公司名稱輸入畫面
-        if (!userCompany) {
-          isUserVerified = true;
-          currentUsername = u;
-          showUserCompanyInput();
-          msgEl.textContent = t.msgEnterCompany;
           return;
         }
 
-        // 如果有綁定，直接登入
-        sessionStorage.setItem("loggedIn", "yes");
-        sessionStorage.setItem("role", "user");
-        sessionStorage.setItem("companyId", userCompany.companyId);
-        sessionStorage.setItem("companyName", userCompany.companyName);
-        window.location.href = "./app.html";
-        return;
+        // user 登入流程
+        if (userRole === "user") {
+          const userCompany = getUserCompany(email);
+          
+          // 如果沒有綁定公司，顯示公司名稱輸入畫面
+          if (!userCompany) {
+            isUserVerified = true;
+            currentUsername = email;
+            showUserCompanyInput();
+            msgEl.textContent = t.msgEnterCompany;
+            return;
+          }
+
+          // 如果有綁定，直接登入
+          sessionStorage.setItem("role", "user");
+          sessionStorage.setItem("companyId", userCompany.companyId);
+          sessionStorage.setItem("companyName", userCompany.companyName);
+          window.location.href = "./app.html";
+          return;
+        }
+
+        msgEl.textContent = t.msgRoleErr;
+      } catch (err) {
+        // 網路錯誤或其他異常
+        console.error("[Supabase Login] Error:", err);
+        alert("登入時發生錯誤：" + (err.message || "請稍後再試"));
+        msgEl.textContent = t.msgBadCred;
       }
-
-
-      msgEl.textContent = t.msgRoleErr;
     }
 
     /* =============================
