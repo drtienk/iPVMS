@@ -29,7 +29,7 @@ window.cloudModelCompanyTryReadOnce = async function cloudModelCompanyTryReadOnc
     const companyIdStr = String(companyId).trim();
     const cloudId = `model_company__${companyIdStr}`;
 
-    console.log("[CLOUD][READ][COMPANY] attempting read", { companyId: companyIdStr, cloudId });
+    console.log("[CLOUD][READ][COMPANY] query", { companyId: companyIdStr, id: cloudId });
 
     // Read from Supabase
     try {
@@ -37,36 +37,67 @@ window.cloudModelCompanyTryReadOnce = async function cloudModelCompanyTryReadOnc
         .from("cloud_status")
         .select("payload")
         .eq("id", cloudId)
-        .single();
+        .maybeSingle();
 
       if (readError) {
-        // Check if it's a "not found" error (expected when no cloud data)
-        if (readError.code === "PGRST116" || readError.message?.includes("No rows")) {
-          console.log("[CLOUD][READ][COMPANY] no data in cloud, keep local");
+        // Check if it's a "no rows" error (expected when no cloud data)
+        const isNoRowError = 
+          readError.code === "PGRST116" ||
+          readError.status === 406 ||
+          readError.message?.includes("No rows") ||
+          readError.message?.includes("Results contain 0 rows") ||
+          readError.message?.includes("JSON object requested, multiple (or no) rows returned");
+
+        if (isNoRowError) {
+          console.log("[CLOUD][READ][COMPANY] no data in cloud, keep local", { 
+            companyId: companyIdStr, 
+            id: cloudId, 
+            reason: "no_row" 
+          });
           return;
         }
 
         // Check if table is missing
         if (readError.message && readError.message.includes("Could not find the table")) {
           console.error("[CLOUD][HINT] Create table cloud_status (id text PK, payload text, updated_at timestamptz default now())");
-          console.warn("[CLOUD][READ][COMPANY] error, fallback local", readError.message);
+          console.warn("[CLOUD][READ][COMPANY] error, fallback local", { 
+            companyId: companyIdStr, 
+            id: cloudId, 
+            msg: readError.message, 
+            code: readError.code, 
+            status: readError.status 
+          });
           return;
         }
 
         // Other errors
-        console.warn("[CLOUD][READ][COMPANY] error, fallback local", readError.message);
+        console.warn("[CLOUD][READ][COMPANY] error, fallback local", { 
+          companyId: companyIdStr, 
+          id: cloudId, 
+          msg: readError.message, 
+          code: readError.code, 
+          status: readError.status 
+        });
         return;
       }
 
       // Check if row exists and has payload
       if (!rowData || !rowData.payload) {
-        console.log("[CLOUD][READ][COMPANY] no data in cloud, keep local");
+        console.log("[CLOUD][READ][COMPANY] no data in cloud, keep local", { 
+          companyId: companyIdStr, 
+          id: cloudId, 
+          reason: "empty_payload" 
+        });
         return;
       }
 
       const payloadStr = String(rowData.payload).trim();
       if (payloadStr === "") {
-        console.log("[CLOUD][READ][COMPANY] payload is empty, keep local");
+        console.log("[CLOUD][READ][COMPANY] no data in cloud, keep local", { 
+          companyId: companyIdStr, 
+          id: cloudId, 
+          reason: "empty_payload" 
+        });
         return;
       }
 
