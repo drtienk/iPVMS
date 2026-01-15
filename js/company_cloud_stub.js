@@ -17,15 +17,10 @@ window.cloudCompanyEnsure = async function cloudCompanyEnsure(companyId, company
     return;
   }
 
-  // Create Supabase client (same config as login.html / cloud_status.js)
-  const SUPABASE_URL = "https://nbaebhfnvkgcapoxddkq.supabase.co";
-  const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5iYWViaGZudmtnY2Fwb3hkZGtxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg0MjQ0MzQsImV4cCI6MjA4NDAwMDQzNH0.xFc5NhCwRApgq_f-hp3pBkJZOz6YHhm8mR67xz9Do6g";
-
-  let sb = null;
-  try {
-    sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-  } catch (err) {
-    console.error("[COMPANY][TEST] Failed to create Supabase client:", err);
+  // Use singleton Supabase client
+  const sb = window.SB;
+  if (!sb) {
+    console.error("[COMPANY][TEST] window.SB not available - ensure sb_client_singleton.js is loaded");
     return;
   }
 
