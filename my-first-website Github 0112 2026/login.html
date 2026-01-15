@@ -4,6 +4,9 @@
   <meta charset="UTF-8">
   <title>Login</title>
 
+  <!-- ✅ Supabase JS SDK (CDN) - Required for authentication -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
   <style>
     body {
       font-family: system-ui, -apple-system, "Segoe UI", "Noto Sans TC", Arial, sans-serif;
@@ -150,9 +153,19 @@
   </div>
 
   <script>
+    // ===== START CHANGE =====
+    // ✅ Supabase Client 初始化 (NEW - This is the ONLY source of authentication)
+    // ===== START CHANGE =====
+    const SUPABASE_URL = "https://nbaebhfnvkgcapoxddkq.supabase.co";
+    const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5iYWViaGZudmtnY2Fwb3hkZGtxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg0MjQ0MzQsImV4cCI6MjA4NDAwMDQzNH0.xFc5NhCwRApgq_f-hp3pBkJZOz6YHhm8mR67xz9Do6g";
+    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    // ===== END CHANGE =====
+
     /* =============================
        帳號資料（前端假資料）
        ============================= */
+    // LEGACY AUTH (disabled, Supabase is source of truth)
+    // ⚠️ NOTE: These functions are kept for role lookup only, NOT for password validation
       // Seed accounts (hardcoded defaults)
       const USER_ACCOUNTS_SEED = {
         admin: { password: "admin", role: "admin" },
@@ -955,73 +968,121 @@
     /* =============================
        登入主流程（保留你原本兩段式）
        ============================= */
-    function login() {
-      const u = document.getElementById("username").value.trim();
-      const p = document.getElementById("password").value.trim();
+    // ===== START CHANGE =====
+    // ✅ MODIFIED: Now uses Supabase Auth as the ONLY source of authentication
+    // Legacy password validation is disabled (commented out below)
+    // ===== START CHANGE =====
+    async function login() {
+      // Get email and password from form (username input is treated as email)
+      const email = document.getElementById("username").value.trim();
+      const password = document.getElementById("password").value.trim();
       const c = document.getElementById("company").value;
       const msgEl = document.getElementById("msg");
       const t = I18N[getLang()] || I18N.en;
 
       msgEl.textContent = "";
 
-      const accounts = getUserAccounts();
-      const account = accounts[u];
-      if (!account || account.password !== p) {
+      // Validate input
+      if (!email || !password) {
         msgEl.textContent = t.msgBadCred;
         return;
       }
 
-      // admin 兩段式
-      if (account.role === "admin") {
-        if (!isAdminVerified) {
-          isAdminVerified = true;
-          showCompanyDropdown();
-          msgEl.textContent = t.msgPickCompany;
+      // ===== LEGACY AUTH CODE (DISABLED) =====
+      // LEGACY AUTH (disabled, Supabase is source of truth)
+      // const accounts = getUserAccounts();
+      // const account = accounts[u];
+      // if (!account || account.password !== p) {
+      //   msgEl.textContent = t.msgBadCred;
+      //   return;
+      // }
+      // ===== END LEGACY AUTH CODE =====
+
+      // ✅ NEW: Use Supabase Auth for authentication
+      try {
+        const { data, error } = await supabase.auth.signInWithPassword({
+          email: email,
+          password: password
+        });
+
+        if (error) {
+          // Login failed: show error message
+          console.log("[AUTH] Supabase login failed:", error.message);
+          alert(error.message || "登入失敗，請檢查帳號密碼");
+          msgEl.textContent = t.msgBadCred;
           return;
         }
 
-        if (c === "") {
-          msgEl.textContent = t.msgPickCompany;
-          return;
-        }
+        // ✅ Login successful: use Supabase user data as identity source
+        console.log("[AUTH] Supabase login success:", { 
+          email: data.user.email, 
+          userId: data.user.id 
+        });
 
-                sessionStorage.setItem("loggedIn", "yes");
+        // Store Supabase user info in sessionStorage
+        sessionStorage.setItem("loggedIn", "yes");
+        sessionStorage.setItem("userEmail", data.user.email || email);
+        sessionStorage.setItem("userId", data.user.id || "");
+
+        // ⚠️ TEMPORARY: Get role from legacy local data (for now, until roles are moved to Supabase)
+        // This is a temporary solution - roles should eventually come from Supabase
+        const accounts = getUserAccounts();
+        const account = accounts[email] || null;
+        const userRole = account ? account.role : "user"; // Default to "user" if not found in local data
+
+        // ✅ Continue with existing admin/user flow logic (unchanged)
+        // admin 兩段式
+        if (userRole === "admin") {
+          if (!isAdminVerified) {
+            isAdminVerified = true;
+            showCompanyDropdown();
+            msgEl.textContent = t.msgPickCompany;
+            return;
+          }
+
+          if (c === "") {
+            msgEl.textContent = t.msgPickCompany;
+            return;
+          }
+
           sessionStorage.setItem("role", "admin");
-
           // ✅ admin 也用「統一格式」存公司
           sessionStorage.setItem("companyId", COMPANY_ID_MAP[c] || c);
           sessionStorage.setItem("companyName", c);
-
           window.location.href = "./app.html";
-return;
-
-      }
-
-      // user 登入流程
-      if (account.role === "user") {
-        const userCompany = getUserCompany(u);
-        
-        // 如果沒有綁定公司，顯示公司名稱輸入畫面
-        if (!userCompany) {
-          isUserVerified = true;
-          currentUsername = u;
-          showUserCompanyInput();
-          msgEl.textContent = t.msgEnterCompany;
           return;
         }
 
-        // 如果有綁定，直接登入
-        sessionStorage.setItem("loggedIn", "yes");
-        sessionStorage.setItem("role", "user");
-        sessionStorage.setItem("companyId", userCompany.companyId);
-        sessionStorage.setItem("companyName", userCompany.companyName);
-        window.location.href = "./app.html";
-        return;
+        // user 登入流程
+        if (userRole === "user") {
+          const userCompany = getUserCompany(email);
+          
+          // 如果沒有綁定公司，顯示公司名稱輸入畫面
+          if (!userCompany) {
+            isUserVerified = true;
+            currentUsername = email;
+            showUserCompanyInput();
+            msgEl.textContent = t.msgEnterCompany;
+            return;
+          }
+
+          // 如果有綁定，直接登入
+          sessionStorage.setItem("role", "user");
+          sessionStorage.setItem("companyId", userCompany.companyId);
+          sessionStorage.setItem("companyName", userCompany.companyName);
+          window.location.href = "./app.html";
+          return;
+        }
+
+        msgEl.textContent = t.msgRoleErr;
+      } catch (err) {
+        // Network error or other exception
+        console.error("[AUTH] Supabase login error:", err);
+        alert("登入時發生錯誤：" + (err.message || "請稍後再試"));
+        msgEl.textContent = t.msgBadCred;
       }
-
-
-      msgEl.textContent = t.msgRoleErr;
     }
+    // ===== END CHANGE =====
 
     /* =============================
        顯示使用者公司名稱輸入畫面
