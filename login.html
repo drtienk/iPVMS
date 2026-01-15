@@ -168,6 +168,74 @@
     const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
     console.log("[LOGIN] loaded v2026-01-15-LOGIN-1");
 
+    // ===== AUTH DEBUG + ALIGN (Day1 Step1) =====
+    (async function initAuthDebug() {
+      try {
+        // Helper: Extract auth info from session
+        function getAuthInfo(session) {
+          return {
+            hasSession: !!session,
+            userEmail: session?.user?.email || null
+          };
+        }
+
+        // 1) On page load: check session and log [AUTH][BOOT]
+        try {
+          const { data: sessionData, error: sessionError } = await sb.auth.getSession();
+          const bootInfo = getAuthInfo(sessionData?.session);
+          console.log("[AUTH][BOOT]", bootInfo);
+
+          // 2) Enforce "close all tabs logs out": if Supabase has session but sessionStorage loggedIn!=yes, sign out
+          if (bootInfo.hasSession && sessionStorage.getItem("loggedIn") !== "yes") {
+            console.log("[AUTH][ALIGN] session exists but sessionStorage loggedIn!=yes -> signing out");
+            try {
+              await sb.auth.signOut();
+            } catch (signOutErr) {
+              console.error("[AUTH][ALIGN] signOut error:", signOutErr);
+            }
+          }
+        } catch (bootErr) {
+          console.error("[AUTH][BOOT] getSession error:", bootErr);
+        }
+
+        // 3) Register auth state change listener
+        try {
+          sb.auth.onAuthStateChange((event, session) => {
+            const eventInfo = getAuthInfo(session);
+            console.log("[AUTH][EVENT]", { event, ...eventInfo });
+
+            // 4) Clear sessionStorage on real sign-out
+            if (event === "SIGNED_OUT" || !session) {
+              try {
+                sessionStorage.removeItem("loggedIn");
+                sessionStorage.removeItem("role");
+                sessionStorage.removeItem("companyId");
+                sessionStorage.removeItem("companyName");
+                sessionStorage.removeItem("userEmail");
+                sessionStorage.removeItem("userId");
+              } catch (clearErr) {
+                console.error("[AUTH][EVENT] clear sessionStorage error:", clearErr);
+              }
+            }
+          });
+        } catch (listenerErr) {
+          console.error("[AUTH][EVENT] onAuthStateChange registration error:", listenerErr);
+        }
+      } catch (err) {
+        console.error("[AUTH][DEBUG] initAuthDebug error:", err);
+        // Never break the page - continue silently
+      }
+    })();
+    // ===== END AUTH DEBUG + ALIGN =====
+    /*
+      Manual Test Instructions:
+      1. Open login.html, check console for [AUTH][BOOT] log
+      2. Login successfully, check [AUTH][EVENT] shows SIGNED_IN
+      3. Reload page, confirm events/logs appear
+      4. Close the tab(s), reopen login.html: if sessionStorage loggedIn is gone,
+         it should auto sign out and log [AUTH][ALIGN]
+    */
+
     // === INVITE CALLBACK CATCHER (Supabase Dashboard Invite Fix) ===
     // Detect Supabase invite callback parameters and redirect to set-password.html
     (function handleInviteRedirect() {
