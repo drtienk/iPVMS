@@ -7,7 +7,35 @@
     // Preserve query string and hash for Supabase invite/verify callbacks
     const qs = window.location.search || "";
     const hash = window.location.hash || "";
-    location.replace("login.html" + qs + hash);
+    
+    // Detect Supabase auth callback indicators
+    const isAuthCallback = 
+      // Query string checks
+      qs.includes("type=invite") || 
+      qs.includes("type=recovery") || 
+      qs.includes("type=signup") || 
+      qs.includes("type=magiclink") || 
+      qs.includes("type=verification") ||
+      qs.includes("token=") || 
+      qs.includes("code=") ||
+      // Hash checks
+      hash.includes("access_token=") || 
+      hash.includes("refresh_token=") || 
+      hash.includes("type=") || 
+      hash.includes("error=") || 
+      hash.includes("error_description=");
+    
+    // Route to set-password.html for auth callbacks, otherwise login.html
+    const target = isAuthCallback ? "set-password.html" : "login.html";
+    
+    console.log("[index.html] Routing decision:", {
+      qs: qs,
+      hash: hash,
+      isAuthCallback: isAuthCallback,
+      target: target
+    });
+    
+    location.replace(target + qs + hash);
   </script>
 </head>
 <body>
