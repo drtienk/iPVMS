@@ -199,7 +199,7 @@
 
     // ✅ Admin emails list (for role detection)
     // TODO: Replace with your actual admin email(s)
-    const ADMIN_EMAILS = ["<drtienk@gmail.com>"];
+    const ADMIN_EMAILS = ["drtienk@gmail.com"].map(e => e.toLowerCase().trim());
     // ===== END CHANGE =====
 
     /* =============================
@@ -1066,7 +1066,11 @@
         sessionStorage.setItem("userId", data.user.id || "");
 
         // ✅ Get role from ADMIN_EMAILS list (based on email)
-        const userRole = ADMIN_EMAILS.includes(data.user.email || email) ? "admin" : "user";
+        const rawEmail = (data.user.email || email || "");
+        const normalizedEmail = rawEmail.toLowerCase().trim();
+        const userRole = ADMIN_EMAILS.includes(normalizedEmail) ? "admin" : "user";
+
+        alert("DEBUG LOGIN\nemail = " + rawEmail + "\nnormalized = " + normalizedEmail + "\nrole = " + userRole);
         console.log("[AUTH] session", await sb.auth.getSession());
         console.log("[AUTH] userRole", userRole);
 
