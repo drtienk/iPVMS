@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Sign Up</title>
+
+  <!-- ✅ Supabase JS SDK (CDN) - Required for authentication -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+  <style>
+    body {
+      font-family: system-ui, -apple-system, "Segoe UI", "Noto Sans TC", Arial, sans-serif;
+      background: #f6f7f9;
+      padding: 40px;
+      margin: 0;
+    }
+
+    .signup-box {
+      max-width: 360px;
+      margin: 0 auto;
+      background: #fff;
+      border-radius: 12px;
+      padding: 24px;
+      box-shadow: 0 10px 24px rgba(0,0,0,0.08);
+    }
+
+    h2 {
+      margin-top: 6px;
+      text-align: center;
+    }
+
+    label {
+      display: block;
+      margin-top: 12px;
+      margin-bottom: 4px;
+    }
+
+    input {
+      width: 100%;
+      padding: 8px;
+      box-sizing: border-box;
+    }
+
+    button {
+      margin-top: 16px;
+      width: 100%;
+      padding: 10px;
+      cursor: pointer;
+      background: #3b82f6;
+      color: white;
+      border: 0;
+      border-radius: 8px;
+      font-weight: 600;
+    }
+
+    button:hover {
+      background: #2563eb;
+    }
+
+    #msg {
+      margin-top: 12px;
+      min-height: 18px;
+      font-size: 14px;
+    }
+
+    #msg.success {
+      color: #10b981;
+    }
+
+    #msg.error {
+      color: #ef4444;
+    }
+
+    .back-link {
+      margin-top: 16px;
+      text-align: center;
+    }
+
+    .back-link a {
+      color: #3b82f6;
+      text-decoration: none;
+      font-size: 14px;
+    }
+
+    .back-link a:hover {
+      text-decoration: underline;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="signup-box">
+    <h2>Sign Up</h2>
+
+    <label for="email">Email</label>
+    <input id="email" type="email" autocomplete="email" placeholder="your@email.com">
+
+    <label for="password">Password</label>
+    <input id="password" type="password" autocomplete="new-password" placeholder="至少 8 個字元">
+
+    <label for="confirmPassword">Confirm Password</label>
+    <input id="confirmPassword" type="password" autocomplete="new-password" placeholder="再次輸入密碼">
+
+    <button id="signupBtn" onclick="handleSignUp()">Sign Up</button>
+
+    <p id="msg"></p>
+
+    <div class="back-link">
+      <a href="./login.html">← Back to Login</a>
+    </div>
+  </div>
+
+  <script>
+    console.log("✅ [signup] loaded");
+
+    // ✅ Supabase Client 初始化
+    const SUPABASE_URL = "https://nbaebhfnvkgcapoxddkq.supabase.co";
+    const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5iYWViaGZudmtnY2Fwb3hkZGtxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg0MjQ0MzQsImV4cCI6MjA4NDAwMDQzNH0.xFc5NhCwRApgq_f-hp3pBkJZOz6YHhm8mR67xz9Do6g";
+    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    // 計算絕對登入 URL（考慮 GitHub Pages 子目錄）
+    function getAbsoluteLoginUrl() {
+      const base = location.origin + location.pathname.replace(/[^/]*$/, '');
+      const loginUrl = base + 'login.html';
+      return loginUrl;
+    }
+
+    // 處理註冊
+    async function handleSignUp() {
+      console.log("✅ [signup] click");
+
+      const email = document.getElementById("email").value.trim();
+      const password = document.getElementById("password").value.trim();
+      const confirmPassword = document.getElementById("confirmPassword").value.trim();
+      const msgEl = document.getElementById("msg");
+
+      // 清除舊訊息
+      msgEl.textContent = "";
+      msgEl.className = "";
+
+      // 驗證輸入
+      if (!email) {
+        msgEl.textContent = "請輸入 Email";
+        msgEl.className = "error";
+        return;
+      }
+
+      if (!password) {
+        msgEl.textContent = "請輸入密碼";
+        msgEl.className = "error";
+        return;
+      }
+
+      // 密碼規則：長度 >= 8
+      if (password.length < 8) {
+        msgEl.textContent = "密碼長度至少需要 8 個字元";
+        msgEl.className = "error";
+        return;
+      }
+
+      // 確認密碼必須匹配
+      if (password !== confirmPassword) {
+        msgEl.textContent = "確認密碼與密碼不相符";
+        msgEl.className = "error";
+        return;
+      }
+
+      // 計算絕對登入 URL
+      const loginUrl = getAbsoluteLoginUrl();
+
+      try {
+        // 呼叫 Supabase signUp
+        const { data, error } = await supabase.auth.signUp({
+          email: email,
+          password: password,
+          options: {
+            emailRedirectTo: loginUrl
+          }
+        });
+
+        if (error) {
+          console.log("❌ [signup] error", error);
+          msgEl.textContent = error.message;
+          msgEl.className = "error";
+          return;
+        }
+
+        // 成功訊息
+        msgEl.textContent = "✅ Sign up submitted. Please check your email to confirm, then go back to Login.";
+        msgEl.className = "success";
+
+        // 清空輸入框
+        document.getElementById("email").value = "";
+        document.getElementById("password").value = "";
+        document.getElementById("confirmPassword").value = "";
+
+      } catch (err) {
+        console.log("❌ [signup] error", err);
+        msgEl.textContent = err.message || "註冊時發生錯誤，請稍後再試";
+        msgEl.className = "error";
+      }
+    }
+
+    // Enter 鍵觸發註冊
+    window.addEventListener("DOMContentLoaded", () => {
+      document.getElementById("email").focus();
+
+      document.addEventListener("keydown", (e) => {
+        if (e.key === "Enter") {
+          e.preventDefault();
+          handleSignUp();
+        }
+      });
+    });
+  </script>
+
+</body>
+</html>
