@@ -3,16 +3,20 @@ console.log("✅ [cloud_model_company_read] loaded");
 
 // Expose global function for one-time cloud read
 window.cloudModelCompanyTryReadOnce = async function cloudModelCompanyTryReadOnce(opts) {
+  // Helper to standardize returns
+  function done(ret) {
+    console.log("[CLOUD][READ][COMPANY] done", ret);
+    return ret;
+  }
+
   try {
     // Preconditions
     if (!window.SB) {
-      console.log("[CLOUD][READ][COMPANY] window.SB not available, skip cloud read");
-      return;
+      return done({ ok: false, step: "precondition", reason: "SB_not_available" });
     }
 
     if (window.activeMode !== "model") {
-      console.log("[CLOUD][READ][COMPANY] activeMode is not 'model', skip cloud read");
-      return;
+      return done({ ok: false, step: "precondition", reason: "activeMode_not_model" });
     }
 
     // Get companyId
@@ -22,14 +26,14 @@ window.cloudModelCompanyTryReadOnce = async function cloudModelCompanyTryReadOnc
                       null;
 
     if (!companyId || String(companyId).trim() === "") {
-      console.log("[CLOUD][READ][COMPANY] companyId not found, skip cloud read");
-      return;
+      return done({ ok: false, step: "precondition", reason: "companyId_not_found" });
     }
 
     const companyIdStr = String(companyId).trim();
     const cloudId = `model_company__${companyIdStr}`;
+    const marker = Date.now().toString(36).slice(-6);
 
-    console.log("[CLOUD][READ][COMPANY] query", { companyId: companyIdStr, id: cloudId });
+    console.log("[CLOUD][READ][COMPANY] query", { marker, companyId: companyIdStr, id: cloudId });
 
     // Read from Supabase
     try {
@@ -38,6 +42,15 @@ window.cloudModelCompanyTryReadOnce = async function cloudModelCompanyTryReadOnc
         .select("payload")
         .eq("id", cloudId)
         .maybeSingle();
+
+      console.log("[CLOUD][READ][COMPANY] result", { 
+        marker, 
+        hasError: !!readError, 
+        status: readError?.status, 
+        code: readError?.code, 
+        hasData: !!rowData, 
+        payloadLen: (rowData?.payload || "").length 
+      });
 
       if (readError) {
         // Check if it's a "no rows" error (expected when no cloud data)
@@ -49,65 +62,77 @@ window.cloudModelCompanyTryReadOnce = async function cloudModelCompanyTryReadOnc
           readError.message?.includes("JSON object requested, multiple (or no) rows returned");
 
         if (isNoRowError) {
-          console.log("[CLOUD][READ][COMPANY] no data in cloud, keep local", { 
+          return done({ 
+            ok: false, 
+            step: "no_data", 
+            reason: "no_row", 
             companyId: companyIdStr, 
-            id: cloudId, 
-            reason: "no_row" 
+            id: cloudId 
           });
-          return;
         }
 
         // Check if table is missing
         if (readError.message && readError.message.includes("Could not find the table")) {
           console.error("[CLOUD][HINT] Create table cloud_status (id text PK, payload text, updated_at timestamptz default now())");
-          console.warn("[CLOUD][READ][COMPANY] error, fallback local", { 
-            companyId: companyIdStr, 
-            id: cloudId, 
-            msg: readError.message, 
-            code: readError.code, 
-            status: readError.status 
-          });
-          return;
         }
 
         // Other errors
         console.warn("[CLOUD][READ][COMPANY] error, fallback local", { 
+          marker,
           companyId: companyIdStr, 
           id: cloudId, 
           msg: readError.message, 
           code: readError.code, 
           status: readError.status 
         });
-        return;
+        
+        return done({ 
+          ok: false, 
+          step: "read_error", 
+          reason: readError.message, 
+          companyId: companyIdStr, 
+          id: cloudId,
+          code: readError.code,
+          status: readError.status
+        });
       }
 
       // Check if row exists and has payload
       if (!rowData || !rowData.payload) {
-        console.log("[CLOUD][READ][COMPANY] no data in cloud, keep local", { 
+        return done({ 
+          ok: false, 
+          step: "no_data", 
+          reason: "empty_payload", 
           companyId: companyIdStr, 
-          id: cloudId, 
-          reason: "empty_payload" 
+          id: cloudId 
         });
-        return;
       }
 
       const payloadStr = String(rowData.payload).trim();
       if (payloadStr === "") {
-        console.log("[CLOUD][READ][COMPANY] no data in cloud, keep local", { 
+        return done({ 
+          ok: false, 
+          step: "no_data", 
+          reason: "empty_payload", 
           companyId: companyIdStr, 
-          id: cloudId, 
-          reason: "empty_payload" 
+          id: cloudId 
         });
-        return;
       }
 
       // Parse JSON safely
+      console.log("[CLOUD][READ][COMPANY] parse:start", { marker, payloadLen: payloadStr.length });
+
       let parsed;
       try {
         parsed = JSON.parse(payloadStr);
       } catch (parseErr) {
-        console.warn("[CLOUD][READ][COMPANY] failed to parse payload JSON, fallback local", parseErr.message);
-        return;
+        console.warn("[CLOUD][READ][COMPANY] parse:fail", { marker, companyId: companyIdStr, id: cloudId }, parseErr);
+        return done({ 
+          ok: false, 
+          step: "parse_fail", 
+          companyId: companyIdStr, 
+          id: cloudId 
+        });
       }
 
       // Extract company sheet data
@@ -116,54 +141,109 @@ window.cloudModelCompanyTryReadOnce = async function cloudModelCompanyTryReadOnc
 
       // Validate it's an object
       if (!companySheetFromCloud || typeof companySheetFromCloud !== "object" || Array.isArray(companySheetFromCloud)) {
-        console.warn("[CLOUD][READ][COMPANY] payload is not a valid sheet object, fallback local");
-        return;
+        console.warn("[CLOUD][READ][COMPANY] payload is not a valid sheet object, fallback local", { marker });
+        return done({ 
+          ok: false, 
+          step: "validation_fail", 
+          reason: "not_valid_sheet_object", 
+          companyId: companyIdStr, 
+          id: cloudId 
+        });
       }
 
-      // Ensure window.sheets and window.sheets.company exist
-      if (!window.sheets) {
-        window.sheets = {};
-      }
-      if (!window.sheets.company) {
-        window.sheets.company = {};
+      // Check if target exists before applying
+      if (!window.sheets || !window.sheets.company) {
+        console.warn("[CLOUD][READ][COMPANY] apply:missing_target", { 
+          marker, 
+          hasSheets: !!window.sheets, 
+          hasCompany: !!window.sheets?.company 
+        });
+        return done({ 
+          ok: false, 
+          step: "apply_missing_target", 
+          companyId: companyIdStr, 
+          id: cloudId 
+        });
       }
 
       // Apply cloud data to in-memory sheets
-      Object.assign(window.sheets.company, companySheetFromCloud);
-
-      // Call helper functions if available
-      if (typeof window.ensureHeadersForActiveSheet === "function") {
-        try {
-          window.ensureHeadersForActiveSheet();
-        } catch (err) {
-          console.warn("[CLOUD][READ][COMPANY] ensureHeadersForActiveSheet error", err.message);
-        }
+      try {
+        Object.assign(window.sheets.company, companySheetFromCloud);
+      } catch (assignErr) {
+        console.warn("[CLOUD][READ][COMPANY] apply:assign_fail", { marker }, assignErr);
+        return done({ 
+          ok: false, 
+          step: "assign_fail", 
+          companyId: companyIdStr, 
+          id: cloudId 
+        });
       }
 
-      if (typeof window.render === "function") {
-        try {
-          window.render();
-        } catch (err) {
-          console.warn("[CLOUD][READ][COMPANY] render error", err.message);
-        }
+      // Call helper functions if available (do NOT throw)
+      try {
+        window.ensureHeadersForActiveSheet?.();
+      } catch (e) {
+        console.warn("[CLOUD][READ][COMPANY] post:ensureHeaders_fail", { marker }, e);
+      }
+
+      try {
+        window.render?.();
+      } catch (e) {
+        console.warn("[CLOUD][READ][COMPANY] post:render_fail", { marker }, e);
       }
 
       // Log success
       console.log("[CLOUD][READ][COMPANY] applied cloud data", { 
+        marker, 
         companyId: companyIdStr, 
+        id: cloudId, 
+        bytes: payloadStr.length 
+      });
+
+      return done({ 
+        ok: true, 
+        step: "applied", 
+        companyId: companyIdStr, 
+        id: cloudId, 
         bytes: payloadStr.length 
       });
 
     } catch (err) {
-      // Catch any unexpected errors
+      // Catch any unexpected errors in read/parse/apply flow
       if (err.message && err.message.includes("Could not find the table")) {
         console.error("[CLOUD][HINT] Create table cloud_status (id text PK, payload text, updated_at timestamptz default now())");
       }
-      console.warn("[CLOUD][READ][COMPANY] error, fallback local", err.message);
+      const companyIdStr = window.documentMeta?.companyId || 
+                           (typeof window.companyScopeKey === "function" ? window.companyScopeKey() : null) ||
+                           sessionStorage.getItem("companyId") ||
+                           "unknown";
+      const cloudId = `model_company__${companyIdStr}`;
+      console.warn("[CLOUD][READ][COMPANY] error, fallback local", { companyId: companyIdStr, id: cloudId }, err);
+      return done({ 
+        ok: false, 
+        step: "read_flow_error", 
+        companyId: companyIdStr, 
+        id: cloudId 
+      });
     }
 
   } catch (err) {
     // Outer catch for any errors in the function
-    console.warn("[CLOUD][READ][COMPANY] unexpected error, fallback local", err.message);
+    function done(ret) {
+      console.log("[CLOUD][READ][COMPANY] done", ret);
+      return ret;
+    }
+    const companyIdStr = window.documentMeta?.companyId || 
+                         (typeof window.companyScopeKey === "function" ? window.companyScopeKey() : null) ||
+                         sessionStorage.getItem("companyId") ||
+                         "unknown";
+    const cloudId = companyIdStr !== "unknown" ? `model_company__${companyIdStr}` : "unknown";
+    console.warn("[CLOUD][READ][COMPANY] unexpected error (fallback local)", { companyId: companyIdStr, id: cloudId }, err);
+    return done({ 
+      ok: false, 
+      step: "unexpected_error", 
+      companyId: companyIdStr, 
+      id: cloudId 
+    });
   }
 };
