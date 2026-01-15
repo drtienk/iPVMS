@@ -56,11 +56,17 @@ if (typeof window === "undefined" || !window.supabase) {
 
         if (writeError) {
           console.log("[CLOUD][WRITE] error", writeError.message);
+          if (writeError.message && writeError.message.includes("Could not find the table")) {
+            console.error("[CLOUD][HINT] Table 'cloud_status' does not exist. Please create it in Supabase Dashboard.");
+          }
         } else {
           console.log("[CLOUD][WRITE] ok");
         }
       } catch (writeErr) {
         console.log("[CLOUD][WRITE] error", writeErr.message);
+        if (writeErr.message && writeErr.message.includes("Could not find the table")) {
+          console.error("[CLOUD][HINT] Table 'cloud_status' does not exist. Please create it in Supabase Dashboard.");
+        }
       }
 
       // Read: select from cloud_status table
@@ -73,11 +79,17 @@ if (typeof window === "undefined" || !window.supabase) {
 
         if (readError) {
           console.log("[CLOUD][READ] error", readError.message);
+          if (readError.message && readError.message.includes("Could not find the table")) {
+            console.error("[CLOUD][HINT] Table 'cloud_status' does not exist. Please create it in Supabase Dashboard.");
+          }
         } else {
           console.log("[CLOUD][READ] ok", readData);
         }
       } catch (readErr) {
         console.log("[CLOUD][READ] error", readErr.message);
+        if (readErr.message && readErr.message.includes("Could not find the table")) {
+          console.error("[CLOUD][HINT] Table 'cloud_status' does not exist. Please create it in Supabase Dashboard.");
+        }
       }
 
     } catch (err) {
