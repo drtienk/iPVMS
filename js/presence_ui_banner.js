@@ -1,6 +1,35 @@
 // === presence_ui_banner.js - Presence UI banner helper ===
 console.log("✅ [presence_ui_banner] loaded");
 
+// Define bilingual text constants
+const PRESENCE_TEXT = {
+  en: "Someone else is using this workspace.",
+  zh: "有人正在使用這個工作區。"
+};
+
+// Helper function to detect current language safely
+function detectCurrentLang() {
+  // Determine language in this order (safe checks)
+  let langValue = null;
+  
+  if (typeof window.currentLang !== "undefined" && window.currentLang) {
+    langValue = String(window.currentLang);
+  } else if (typeof window.lang !== "undefined" && window.lang) {
+    langValue = String(window.lang);
+  } else {
+    // Default to "zh"
+    return "zh";
+  }
+  
+  // Treat as English if value starts with "en", Chinese otherwise
+  const langLower = langValue.toLowerCase();
+  if (langLower.startsWith("en")) {
+    return "en";
+  } else {
+    return "zh";
+  }
+}
+
 // A) window.presenceBannerEnsure()
 // Creates a div with id presenceBanner if it doesn't exist
 window.presenceBannerEnsure = function presenceBannerEnsure() {
@@ -17,16 +46,9 @@ window.presenceBannerEnsure = function presenceBannerEnsure() {
     // Style minimally using inline style
     banner.style.cssText = "position: fixed; top: 0; left: 0; right: 0; padding: 8px 12px; font-size: 12px; background: #111827; color: #fff; z-index: 99998; display: none; text-align: center;";
     
-    // Banner text (detect language or show both)
-    // If app is zh-Hant, default to Chinese; otherwise show both
-    const lang = (document.documentElement.lang || "").toLowerCase();
-    const isZh = lang.includes("zh") || lang.includes("hant") || lang.includes("hans");
-    
-    if (isZh) {
-      banner.textContent = "有人正在使用這個工作區。";
-    } else {
-      banner.textContent = "Someone else is using this workspace. / 有人正在使用這個工作區。";
-    }
+    // Set banner text dynamically based on current language
+    const langKey = detectCurrentLang();
+    banner.textContent = PRESENCE_TEXT[langKey] || PRESENCE_TEXT.zh;
 
     // Append to body
     if (document.body) {
@@ -71,11 +93,18 @@ window.presenceBannerSet = function presenceBannerSet(isOtherActive) {
       setTimeout(function() {
         const bannerRetry = document.getElementById("presenceBanner");
         if (bannerRetry) {
+          // Update text before showing
+          const langKey = detectCurrentLang();
+          bannerRetry.textContent = PRESENCE_TEXT[langKey] || PRESENCE_TEXT.zh;
           bannerRetry.style.display = isOtherActive ? "block" : "none";
         }
       }, 10);
       return;
     }
+
+    // Update banner text dynamically before showing (language may have changed)
+    const langKey = detectCurrentLang();
+    banner.textContent = PRESENCE_TEXT[langKey] || PRESENCE_TEXT.zh;
 
     // If isOtherActive === true: show banner
     // Else: hide banner
