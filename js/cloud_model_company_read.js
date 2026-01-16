@@ -166,9 +166,29 @@ window.cloudModelCompanyTryReadOnce = async function cloudModelCompanyTryReadOnc
         });
       }
 
+      // Fingerprint helper
+      function fpCompany() {
+        const hasCompany = !!(window.sheets && window.sheets.company);
+        return {
+          hasCompany: hasCompany,
+          len: hasCompany ? JSON.stringify(window.sheets.company).length : 0,
+          rowCount: hasCompany && Array.isArray(window.sheets.company.data) ? window.sheets.company.data.length : 0,
+          firstRow: hasCompany && Array.isArray(window.sheets.company.data) && window.sheets.company.data.length > 0 
+            ? window.sheets.company.data[0]?.slice(0, 3) : null
+        };
+      }
+
       // Apply cloud data to in-memory sheets
       try {
+        const fpBefore = fpCompany();
+        const cloudLen = JSON.stringify(companySheetFromCloud).length;
+        const cloudRowCount = Array.isArray(companySheetFromCloud.data) ? companySheetFromCloud.data.length : 0;
+        console.log("[DIAG][CLOUD][READ][COMPANY] BEFORE Object.assign", { marker, fpBefore, cloudLen, cloudRowCount });
+
         Object.assign(window.sheets.company, companySheetFromCloud);
+
+        const fpAfter = fpCompany();
+        console.log("[DIAG][CLOUD][READ][COMPANY] AFTER Object.assign", { marker, fpBefore, fpAfter });
       } catch (assignErr) {
         console.warn("[CLOUD][READ][COMPANY] apply:assign_fail", { marker }, assignErr);
         return done({ 
@@ -187,7 +207,11 @@ window.cloudModelCompanyTryReadOnce = async function cloudModelCompanyTryReadOnc
       }
 
       try {
+        const fpBeforeRender = fpCompany();
+        console.log("[DIAG][CLOUD][READ][COMPANY] BEFORE render", { marker, fpBeforeRender });
         window.render?.();
+        const fpAfterRender = fpCompany();
+        console.log("[DIAG][CLOUD][READ][COMPANY] AFTER render", { marker, fpBeforeRender, fpAfterRender });
       } catch (e) {
         console.warn("[CLOUD][READ][COMPANY] post:render_fail", { marker }, e);
       }

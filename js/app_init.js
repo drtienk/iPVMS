@@ -69,6 +69,20 @@ console.log("✅ [19] app_init loaded");
 
   function initAppOnce(){
     try {
+      // Fingerprint helper
+      function fpCompany() {
+        const hasCompany = !!(window.sheets && window.sheets.company);
+        return {
+          hasCompany: hasCompany,
+          len: hasCompany ? JSON.stringify(window.sheets.company).length : 0,
+          rowCount: hasCompany && Array.isArray(window.sheets.company.data) ? window.sheets.company.data.length : 0,
+          firstRow: hasCompany && Array.isArray(window.sheets.company.data) && window.sheets.company.data.length > 0 
+            ? window.sheets.company.data[0]?.slice(0, 3) : null
+        };
+      }
+
+      console.log("[DIAG][app_init] initAppOnce START", { fpCompany: fpCompany() });
+
       // ====== 1) admin buttons ======
       if (typeof window.isAdmin === "function" && window.isAdmin()) {
         if (document.getElementById("sheetAdminBtn")) document.getElementById("sheetAdminBtn").style.display = "";
@@ -99,7 +113,11 @@ console.log("✅ [19] app_init loaded");
         }
 
       } else {
+        const fpBeforeLoad = fpCompany();
+        console.log("[DIAG][app_init] BEFORE loadFromLocalByMode('model')", { fpBeforeLoad });
         window.loadFromLocalByMode?.("model");
+        const fpAfterLoad = fpCompany();
+        console.log("[DIAG][app_init] AFTER loadFromLocalByMode('model')", { fpBeforeLoad, fpAfterLoad });
       }
 
       // ====== 5) apply defs & trim ======
@@ -134,9 +152,13 @@ console.log("✅ [19] app_init loaded");
       try {
         if (!window.__CLOUD_COMPANY_READ_ONCE__) {
           window.__CLOUD_COMPANY_READ_ONCE__ = true;
+          const fpBeforeSchedule = fpCompany();
+          console.log("[DIAG][app_init] BEFORE scheduling cloudModelCompanyTryReadOnce", { fpBeforeSchedule });
           if (typeof window.cloudModelCompanyTryReadOnce === "function") {
             // Run asynchronously to not block init
             setTimeout(() => {
+              const fpBeforeCall = fpCompany();
+              console.log("[DIAG][app_init] INSIDE setTimeout, BEFORE calling cloudModelCompanyTryReadOnce", { fpBeforeCall });
               window.cloudModelCompanyTryReadOnce?.();
             }, 100);
           }

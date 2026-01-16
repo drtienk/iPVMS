@@ -46,12 +46,36 @@ console.log("✅ [09] app_mode_storage loaded");
 
   function loadFromLocalByMode(mode){
     try {
+      // Fingerprint helper
+      function fpCompany() {
+        const hasCompany = !!(window.sheets && window.sheets.company);
+        return {
+          hasCompany: hasCompany,
+          len: hasCompany ? JSON.stringify(window.sheets.company).length : 0,
+          rowCount: hasCompany && Array.isArray(window.sheets.company.data) ? window.sheets.company.data.length : 0,
+          firstRow: hasCompany && Array.isArray(window.sheets.company.data) && window.sheets.company.data.length > 0 
+            ? window.sheets.company.data[0]?.slice(0, 3) : null
+        };
+      }
+
+      // Log BEFORE applying
+      const fpBefore = fpCompany();
       const parsed = getStore()?.loadFromLocalByMode?.(mode);
-      if (!parsed) return;
+      if (!parsed) {
+        console.log("[DIAG][loadFromLocalByMode] no parsed data", { mode, fpBefore });
+        return;
+      }
+      const keysToApply = Object.keys(parsed);
+      console.log("[DIAG][loadFromLocalByMode] BEFORE apply", { mode, keysToApply, fpBefore });
+
       const sheets = window.sheets || {};
       for (const k in parsed) {
         if (sheets[k]) Object.assign(sheets[k], parsed[k]);
       }
+
+      // Log AFTER applying
+      const fpAfter = fpCompany();
+      console.log("[DIAG][loadFromLocalByMode] AFTER apply", { mode, keysToApply, fpBefore, fpAfter });
     } catch (err) {
       window.showErr?.(err);
     }
