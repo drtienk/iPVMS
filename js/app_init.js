@@ -237,6 +237,11 @@ console.log("✅ [19] app_init loaded");
         window.presenceRealtimeSubscribe();
       }
 
+      // ====== 13) Start presence fast read loop (2-second polling when visible) ======
+      if (typeof window.presenceStartFastReadLoop === "function") {
+        window.presenceStartFastReadLoop();
+      }
+
     } catch (err) {
       window.showErr?.(err);
     }

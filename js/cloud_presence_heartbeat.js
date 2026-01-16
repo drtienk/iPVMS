@@ -345,6 +345,53 @@ window.presenceRealtimeSubscribe = function presenceRealtimeSubscribe() {
   setTimeout(trySubscribe, 100);
 })();
 
+// Fast presence read loop (2-second polling when tab is visible)
+window.presenceStartFastReadLoop = function presenceStartFastReadLoop() {
+  // Guard against duplicates
+  if (window.__PRESENCE_FAST_READ_TIMER__) {
+    return;
+  }
+
+  // Set up 2-second interval (only reads when tab is visible)
+  window.__PRESENCE_FAST_READ_TIMER__ = setInterval(() => {
+    if (document.visibilityState !== "visible") {
+      return;
+    }
+    if (typeof window.presenceReadOnce === "function") {
+      window.presenceReadOnce();
+    }
+  }, 2000);
+
+  // Log once
+  console.log("[PRESENCE][FAST] started (2s)");
+
+  // Immediate "poke read" on focus
+  window.addEventListener("focus", function onFocus() {
+    if (typeof window.presenceReadOnce === "function") {
+      console.log("[PRESENCE][FAST] poke read", "focus");
+      window.presenceReadOnce();
+    }
+  });
+
+  // Immediate "poke read" on visibilitychange (when becomes visible)
+  document.addEventListener("visibilitychange", function onVisibilityChange() {
+    if (document.visibilityState === "visible") {
+      if (typeof window.presenceReadOnce === "function") {
+        console.log("[PRESENCE][FAST] poke read", "visibilitychange");
+        window.presenceReadOnce();
+      }
+    }
+  });
+
+  // Immediate "poke read" on pageshow
+  window.addEventListener("pageshow", function onPageShow() {
+    if (typeof window.presenceReadOnce === "function") {
+      console.log("[PRESENCE][FAST] poke read", "pageshow");
+      window.presenceReadOnce();
+    }
+  });
+};
+
 // Optional cleanup: delete this instance's row on beforeunload (non-blocking)
 (function setupBeforeUnloadCleanup() {
   try {
