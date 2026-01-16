@@ -179,6 +179,7 @@ console.log("✅ [19] app_init loaded");
 
       // ====== 10) Start presence heartbeat (write-only) ======
       if (!window.__PRESENCE_HEARTBEAT_STARTED__) {
+        console.log("[PRESENCE][INIT] entering step10", new Date().toISOString());
         window.__PRESENCE_HEARTBEAT_STARTED__ = true;
         console.log("[PRESENCE][INIT] heartbeat started");
         // Call once immediately
@@ -186,7 +187,8 @@ console.log("✅ [19] app_init loaded");
           window.presenceHeartbeatOnce();
         }
         // Set up interval (every 20 seconds)
-        setInterval(() => {
+        window.__PRESENCE_HEARTBEAT_TIMER__ = setInterval(() => {
+          console.log("[PRESENCE][TICK]", new Date().toISOString());
           if (typeof window.presenceHeartbeatOnce === "function") {
             window.presenceHeartbeatOnce();
           }
