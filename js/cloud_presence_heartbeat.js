@@ -5,15 +5,47 @@ console.log("✅ [cloud_presence_heartbeat] loaded");
 const PRESENCE_ACTIVE_WINDOW_SEC = 45;
 const PRESENCE_HEARTBEAT_SEC = 20;
 
-// Generate and store instance ID once per tab (reload-safe)
-if (!window.__PRESENCE_INSTANCE_ID__) {
-  if (typeof crypto !== "undefined" && crypto.randomUUID) {
-    window.__PRESENCE_INSTANCE_ID__ = crypto.randomUUID();
-  } else {
-    // Fallback: generate random string
-    window.__PRESENCE_INSTANCE_ID__ = "inst_" + Date.now() + "_" + Math.random().toString(36).substr(2, 9);
+// Storage key for instance ID
+const KEY = "__presence_instance_id__";
+
+// Ensure instance ID is stable within the same tab session (reload-safe)
+function ensureInstanceId() {
+  if (window.__PRESENCE_INSTANCE_ID__) {
+    return window.__PRESENCE_INSTANCE_ID__;
   }
+  
+  // Read from sessionStorage first
+  let id = null;
+  try {
+    id = sessionStorage.getItem(KEY);
+  } catch (e) {
+    // Ignore storage errors
+  }
+  
+  // If missing, generate new
+  if (!id) {
+    if (typeof crypto !== "undefined" && crypto.randomUUID) {
+      id = crypto.randomUUID();
+    } else {
+      // Fallback: generate random string
+      id = "inst_" + Date.now() + "_" + Math.random().toString(36).substr(2, 9);
+    }
+    
+    // Save back to sessionStorage
+    try {
+      sessionStorage.setItem(KEY, id);
+    } catch (e) {
+      // Ignore storage errors
+    }
+  }
+  
+  // Assign to window.__PRESENCE_INSTANCE_ID__
+  window.__PRESENCE_INSTANCE_ID__ = id;
+  return id;
 }
+
+// Initialize instance ID on load
+ensureInstanceId();
 
 // Export / attach one function only: window.presenceHeartbeatOnce()
 window.presenceHeartbeatOnce = async function presenceHeartbeatOnce() {
@@ -31,14 +63,8 @@ window.presenceHeartbeatOnce = async function presenceHeartbeatOnce() {
       return;
     }
 
-    // Ensure instance ID exists
-    if (!window.__PRESENCE_INSTANCE_ID__) {
-      if (typeof crypto !== "undefined" && crypto.randomUUID) {
-        window.__PRESENCE_INSTANCE_ID__ = crypto.randomUUID();
-      } else {
-        window.__PRESENCE_INSTANCE_ID__ = "inst_" + Date.now() + "_" + Math.random().toString(36).substr(2, 9);
-      }
-    }
+    // Ensure instance ID exists (stable within tab session)
+    ensureInstanceId();
 
     // Build minimal payload (include instance_id for multi-window detection)
     const payload = {
@@ -91,14 +117,8 @@ window.presenceReadOnce = async function presenceReadOnce() {
       return;
     }
 
-    // Ensure instance ID exists
-    if (!window.__PRESENCE_INSTANCE_ID__) {
-      if (typeof crypto !== "undefined" && crypto.randomUUID) {
-        window.__PRESENCE_INSTANCE_ID__ = crypto.randomUUID();
-      } else {
-        window.__PRESENCE_INSTANCE_ID__ = "inst_" + Date.now() + "_" + Math.random().toString(36).substr(2, 9);
-      }
-    }
+    // Ensure instance ID exists (stable within tab session)
+    ensureInstanceId();
 
     // Query cloud_status for presence records for this company
     // Select all columns to handle unknown timestamp column
