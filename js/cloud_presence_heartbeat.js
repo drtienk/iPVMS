@@ -1,6 +1,10 @@
 // === cloud_presence_heartbeat.js - Presence heartbeat write-only helper ===
 console.log("✅ [cloud_presence_heartbeat] loaded");
 
+// Constants for presence detection
+const PRESENCE_ACTIVE_WINDOW_SEC = 45;
+const PRESENCE_HEARTBEAT_SEC = 20;
+
 // Generate and store instance ID once per tab (reload-safe)
 if (!window.__PRESENCE_INSTANCE_ID__) {
   if (typeof crypto !== "undefined" && crypto.randomUUID) {
@@ -113,9 +117,9 @@ window.presenceReadOnce = async function presenceReadOnce() {
 
     // Parse rows and check for other active instances
     const now = Date.now();
-    const thresholdMs = 45000; // 45 seconds
+    const thresholdMs = PRESENCE_ACTIVE_WINDOW_SEC * 1000;
     let otherActiveCount = 0;
-    let newestTsAge = null;
+    let newestOtherAgeSec = null; // Only track "other" instances, not self
 
     for (const row of data) {
       try {
@@ -138,15 +142,16 @@ window.presenceReadOnce = async function presenceReadOnce() {
 
         if (tsMs && !isNaN(tsMs)) {
           const ageMs = now - tsMs;
-          const ageSec = Math.floor(ageMs / 1000);
+          const ageSec = Math.round(ageMs / 1000);
 
-          // Track newest timestamp age
-          if (newestTsAge === null || ageSec < newestTsAge) {
-            newestTsAge = ageSec;
-          }
-
-          // Check if this is another instance (not current window) and within threshold
+          // Check if this is another instance (not current window)
           if (payload.instance_id && payload.instance_id !== window.__PRESENCE_INSTANCE_ID__) {
+            // Track newest "other" instance age
+            if (newestOtherAgeSec === null || ageSec < newestOtherAgeSec) {
+              newestOtherAgeSec = ageSec;
+            }
+
+            // Count if within threshold
             if (ageMs <= thresholdMs) {
               otherActiveCount++;
             }
@@ -158,15 +163,52 @@ window.presenceReadOnce = async function presenceReadOnce() {
       }
     }
 
-    // Log result
+    // Log result with improved format
     if (otherActiveCount > 0) {
-      console.log(`[PRESENCE][READ] other active = true (count=${otherActiveCount})`);
+      const ageInfo = newestOtherAgeSec !== null ? ` newestOtherAge=${newestOtherAgeSec}s` : "";
+      console.log(`[PRESENCE][READ] other active = true (count=${otherActiveCount}${ageInfo} threshold=${PRESENCE_ACTIVE_WINDOW_SEC}s)`);
     } else {
-      const ageInfo = newestTsAge !== null ? ` (newest=${newestTsAge}s)` : "";
-      console.log(`[PRESENCE][READ] other active = false${ageInfo}`);
+      const ageInfo = newestOtherAgeSec !== null ? ` newestOtherAge=${newestOtherAgeSec}s` : " newestOtherAge=null";
+      console.log(`[PRESENCE][READ] other active = false (${ageInfo} threshold=${PRESENCE_ACTIVE_WINDOW_SEC}s)`);
     }
   } catch (err) {
     // Never throw; catch all errors
     console.log("[PRESENCE][READ] error:", err.message);
   }
 };
+
+// Optional cleanup: delete this instance's row on beforeunload (non-blocking)
+(function setupBeforeUnloadCleanup() {
+  try {
+    window.addEventListener("beforeunload", function() {
+      try {
+        // Must be wrapped in try/catch and must not block navigation
+        if (!window.SB || !window.__PRESENCE_INSTANCE_ID__) {
+          return;
+        }
+
+        const companyId = (sessionStorage.getItem("companyId") || "").trim();
+        if (!companyId) {
+          return;
+        }
+
+        // Attempt to delete this instance's row (non-blocking, fire-and-forget)
+        // Use sendBeacon or fetch with keepalive=false to avoid blocking navigation
+        window.SB
+          .from("cloud_status")
+          .delete()
+          .eq("id", `presence_${companyId}_${window.__PRESENCE_INSTANCE_ID__}`)
+          .then(() => {
+            // Success (may not complete before navigation)
+          })
+          .catch(() => {
+            // Ignore errors (cleanup is best-effort)
+          });
+      } catch (cleanupErr) {
+        // Ignore cleanup errors (must not block navigation)
+      }
+    }, { once: true });
+  } catch (setupErr) {
+    // Ignore setup errors (cleanup is optional)
+  }
+})();
