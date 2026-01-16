@@ -1,5 +1,6 @@
 // === cloud_presence_heartbeat.js - Presence heartbeat write-only helper ===
 console.log("✅ [cloud_presence_heartbeat] loaded");
+console.log("✅ [PRESENCE][RT] module loaded");
 
 // Constants for presence detection
 const PRESENCE_ACTIVE_WINDOW_SEC = 45;
@@ -216,20 +217,30 @@ window.presenceReadOnce = async function presenceReadOnce() {
 // Realtime subscription for immediate presence updates
 window.presenceRealtimeSubscribe = function presenceRealtimeSubscribe() {
   try {
+    // Get companyId and check prerequisites first (for logging)
+    const companyId = (sessionStorage.getItem("companyId") || "").trim() || 
+                      (window.documentMeta?.companyId || "").trim();
+    const hasSB = !!window.SB;
+    const already = !!window.__PRESENCE_RT_SUB__;
+
+    // Log function call with diagnostics
+    console.log("[PRESENCE][RT] subscribe() called", { hasSB, companyId, already });
+
     // Guard against duplicates
     if (window.__PRESENCE_RT_SUB__) {
+      console.log("[PRESENCE][RT] already subscribed, skipping");
       return;
     }
     window.__PRESENCE_RT_SUB__ = true;
-
-    // Get companyId and check prerequisites
-    const companyId = (sessionStorage.getItem("companyId") || "").trim() || 
-                      (window.documentMeta?.companyId || "").trim();
     
     if (!window.SB || !companyId) {
-      console.warn("[PRESENCE][RT] missing SB/companyId", { hasSB: !!window.SB, hasCompanyId: !!companyId });
+      console.warn("[PRESENCE][RT] missing SB/companyId", { hasSB, hasCompanyId: !!companyId });
+      window.__PRESENCE_RT_SUB__ = false; // Reset flag so retry can work
       return;
     }
+
+    // Confirm SB is available
+    console.log("[PRESENCE][RT] SB_OK", hasSB);
 
     // Create channel name
     const channelName = `presence_${companyId}`;
@@ -249,16 +260,18 @@ window.presenceRealtimeSubscribe = function presenceRealtimeSubscribe() {
     }, (payload) => {
       try {
         // Filter: only handle presence records for this company
-        const recordId = payload.new?.id || payload.old?.id || '';
-        const presencePrefix = `presence_${companyId}_`;
+        const id = payload.new?.id || payload.old?.id || '';
+        const companyId2 = (sessionStorage.getItem("companyId") || "").trim() || 
+                          (window.documentMeta?.companyId || "").trim();
+        const isPresence = id.startsWith(`presence_${companyId2}_`);
         
-        if (!recordId.startsWith(presencePrefix)) {
+        // Log event (always, even if not presence)
+        console.log("[PRESENCE][RT] event", payload.eventType, { id, isPresence });
+
+        if (!isPresence) {
           // Not a presence record for this company, ignore
           return;
         }
-
-        // Log event
-        console.log("[PRESENCE][RT] event", payload.eventType, recordId);
 
         // Throttle: only call presenceReadOnce if enough time has passed
         const now = Date.now();
@@ -277,7 +290,8 @@ window.presenceRealtimeSubscribe = function presenceRealtimeSubscribe() {
     });
 
     // Subscribe to channel
-    channel.subscribe((status) => {
+    channel.subscribe((status, err) => {
+      console.log("[PRESENCE][RT] status", status, err?.message || "");
       if (status === 'SUBSCRIBED') {
         console.log("[PRESENCE][RT] subscribed", channelName);
       } else if (status === 'CHANNEL_ERROR') {
@@ -298,6 +312,38 @@ window.presenceRealtimeSubscribe = function presenceRealtimeSubscribe() {
     window.__PRESENCE_RT_SUB__ = false; // Reset flag on error
   }
 };
+
+// Auto-initialize Realtime subscription with retry logic (if SB/companyId not ready at load time)
+(function autoInitRealtimeSubscription() {
+  let retryCount = 0;
+  const MAX_RETRIES = 10;
+  const RETRY_INTERVAL_MS = 500;
+
+  function trySubscribe() {
+    const companyId = (sessionStorage.getItem("companyId") || "").trim() || 
+                      (window.documentMeta?.companyId || "").trim();
+    const hasSB = !!window.SB;
+    const hasCompanyId = !!companyId;
+
+    if (hasSB && hasCompanyId) {
+      // Prerequisites ready, try to subscribe
+      if (typeof window.presenceRealtimeSubscribe === "function") {
+        window.presenceRealtimeSubscribe();
+      }
+    } else if (retryCount < MAX_RETRIES) {
+      // Not ready yet, retry
+      retryCount++;
+      console.log("[PRESENCE][RT] retry", retryCount, { hasSB, companyId });
+      setTimeout(trySubscribe, RETRY_INTERVAL_MS);
+    } else {
+      // Max retries reached
+      console.warn("[PRESENCE][RT] max retries reached, giving up", { hasSB, hasCompanyId });
+    }
+  }
+
+  // Start retry logic after a short delay (allow modules to initialize)
+  setTimeout(trySubscribe, 100);
+})();
 
 // Optional cleanup: delete this instance's row on beforeunload (non-blocking)
 (function setupBeforeUnloadCleanup() {
