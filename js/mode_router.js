@@ -25,7 +25,17 @@ window.DEFS.ROUTER = window.DEFS.ROUTER || {};
       if (allowed.size && !allowed.has(nextKey)) nextKey = "company";
     }
 
+    // Check if activeKey actually changed
+    const prevKey = activeKey;
     activeKey = nextKey;
+
+    // Immediately write presence heartbeat if activeKey changed
+    if (prevKey !== nextKey) {
+      if (typeof window.presenceHeartbeatOnce === "function") {
+        console.log("✅ [PRESENCE] immediate heartbeat on setActive", {prevKey, nextKey});
+        window.presenceHeartbeatOnce();
+      }
+    }
 
     // ✅ delegate tabs UI only
     try { window.DEFS?.TABS_UI?.applyTabUI?.(); } catch {}

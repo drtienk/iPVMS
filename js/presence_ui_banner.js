@@ -1,5 +1,6 @@
 // === presence_ui_banner.js - Presence UI banner helper ===
 console.log("✅ [presence_ui_banner] loaded");
+console.log("✅ [presence_ui_banner] banner language forced to EN");
 
 // Define bilingual text constants
 const PRESENCE_TEXT = {
@@ -83,9 +84,8 @@ window.presenceBannerEnsure = function presenceBannerEnsure() {
     // Style minimally using inline style
     banner.style.cssText = "position: fixed; top: 0; left: 0; right: 0; padding: 8px 12px; font-size: 12px; background: #111827; color: #fff; z-index: 99998; display: none; text-align: center;";
     
-    // Set banner text dynamically based on current language
-    const langKey = getLangKey();
-    banner.textContent = PRESENCE_TEXT[langKey] || PRESENCE_TEXT.zh;
+    // Set banner text (forced to English only)
+    banner.textContent = "Someone else is viewing this sheet.";
 
     // Append to body
     if (document.body) {
@@ -130,9 +130,8 @@ window.presenceBannerSet = function presenceBannerSet(isOtherActive) {
       setTimeout(function() {
         const bannerRetry = document.getElementById("presenceBanner");
         if (bannerRetry) {
-          // Update text before showing
-          const k = getLangKey();
-          bannerRetry.textContent = (k === "en") ? "Someone else is viewing this sheet." : "有人正在查看這張表。";
+          // Update text before showing (forced to English only)
+          bannerRetry.textContent = "Someone else is viewing this sheet.";
           bannerRetry.style.display = isOtherActive ? "block" : "none";
           // Debug log every time (lightweight)
           console.log("[PRESENCE][BANNER] show=", !!isOtherActive);
@@ -141,9 +140,8 @@ window.presenceBannerSet = function presenceBannerSet(isOtherActive) {
       return;
     }
 
-    // Update banner text dynamically before showing (language may have changed)
-    const k = getLangKey();
-    banner.textContent = (k === "en") ? "Someone else is viewing this sheet." : "有人正在查看這張表。";
+    // Update banner text (forced to English only)
+    banner.textContent = "Someone else is viewing this sheet.";
 
     // If isOtherActive === true: show banner
     // Else: hide banner
