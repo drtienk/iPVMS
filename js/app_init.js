@@ -232,6 +232,11 @@ console.log("✅ [19] app_init loaded");
         }, 25000);
       }
 
+      // ====== 12) Start presence Realtime subscription (for immediate updates) ======
+      if (typeof window.presenceRealtimeSubscribe === "function") {
+        window.presenceRealtimeSubscribe();
+      }
+
     } catch (err) {
       window.showErr?.(err);
     }

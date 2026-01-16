@@ -213,10 +213,96 @@ window.presenceReadOnce = async function presenceReadOnce() {
   }
 };
 
+// Realtime subscription for immediate presence updates
+window.presenceRealtimeSubscribe = function presenceRealtimeSubscribe() {
+  try {
+    // Guard against duplicates
+    if (window.__PRESENCE_RT_SUB__) {
+      return;
+    }
+    window.__PRESENCE_RT_SUB__ = true;
+
+    // Get companyId and check prerequisites
+    const companyId = (sessionStorage.getItem("companyId") || "").trim() || 
+                      (window.documentMeta?.companyId || "").trim();
+    
+    if (!window.SB || !companyId) {
+      console.warn("[PRESENCE][RT] missing SB/companyId", { hasSB: !!window.SB, hasCompanyId: !!companyId });
+      return;
+    }
+
+    // Create channel name
+    const channelName = `presence_${companyId}`;
+
+    // Throttle: allow calling presenceReadOnce at most once every 300ms
+    let lastReadCall = 0;
+    const THROTTLE_MS = 300;
+
+    // Create Realtime channel
+    const channel = window.SB.channel(channelName);
+
+    // Subscribe to Postgres changes on cloud_status table
+    channel.on('postgres_changes', {
+      event: '*',
+      schema: 'public',
+      table: 'cloud_status'
+    }, (payload) => {
+      try {
+        // Filter: only handle presence records for this company
+        const recordId = payload.new?.id || payload.old?.id || '';
+        const presencePrefix = `presence_${companyId}_`;
+        
+        if (!recordId.startsWith(presencePrefix)) {
+          // Not a presence record for this company, ignore
+          return;
+        }
+
+        // Log event
+        console.log("[PRESENCE][RT] event", payload.eventType, recordId);
+
+        // Throttle: only call presenceReadOnce if enough time has passed
+        const now = Date.now();
+        if (now - lastReadCall >= THROTTLE_MS) {
+          lastReadCall = now;
+          
+          // Call presenceReadOnce to refresh banner
+          if (typeof window.presenceReadOnce === "function") {
+            window.presenceReadOnce();
+          }
+        }
+      } catch (rtErr) {
+        // Never throw from event handler
+        console.warn("[PRESENCE][RT] event handler error", rtErr.message);
+      }
+    });
+
+    // Subscribe to channel
+    channel.subscribe((status) => {
+      if (status === 'SUBSCRIBED') {
+        console.log("[PRESENCE][RT] subscribed", channelName);
+      } else if (status === 'CHANNEL_ERROR') {
+        console.warn("[PRESENCE][RT] channel error", channelName);
+      } else if (status === 'TIMED_OUT') {
+        console.warn("[PRESENCE][RT] subscription timeout", channelName);
+      } else if (status === 'CLOSED') {
+        console.log("[PRESENCE][RT] channel closed", channelName);
+      }
+    });
+
+    // Store channel on window for cleanup
+    window.__PRESENCE_RT_CHANNEL__ = channel;
+
+  } catch (err) {
+    // Must never throw; fail gracefully
+    console.warn("[PRESENCE][RT] subscribe error", err.message);
+    window.__PRESENCE_RT_SUB__ = false; // Reset flag on error
+  }
+};
+
 // Optional cleanup: delete this instance's row on beforeunload (non-blocking)
 (function setupBeforeUnloadCleanup() {
   try {
-    window.addEventListener("beforeunload", function() {
+    function cleanup() {
       try {
         // Must be wrapped in try/catch and must not block navigation
         if (!window.SB || !window.__PRESENCE_INSTANCE_ID__) {
@@ -226,6 +312,16 @@ window.presenceReadOnce = async function presenceReadOnce() {
         const companyId = (sessionStorage.getItem("companyId") || "").trim();
         if (!companyId) {
           return;
+        }
+
+        // Unsubscribe from Realtime channel (best effort)
+        if (window.__PRESENCE_RT_CHANNEL__) {
+          try {
+            window.__PRESENCE_RT_CHANNEL__.unsubscribe();
+            window.__PRESENCE_RT_CHANNEL__ = null;
+          } catch (rtCleanupErr) {
+            // Ignore Realtime cleanup errors
+          }
         }
 
         // Attempt to delete this instance's row (non-blocking, fire-and-forget)
@@ -243,7 +339,10 @@ window.presenceReadOnce = async function presenceReadOnce() {
       } catch (cleanupErr) {
         // Ignore cleanup errors (must not block navigation)
       }
-    }, { once: true });
+    }
+
+    window.addEventListener("beforeunload", cleanup, { once: true });
+    window.addEventListener("pagehide", cleanup, { once: true });
   } catch (setupErr) {
     // Ignore setup errors (cleanup is optional)
   }
