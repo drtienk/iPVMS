@@ -145,27 +145,6 @@ console.log("✅ [19] app_init loaded");
         console.warn("[app_init] cloud read hook error (non-fatal):", err.message);
       }
 
-      // ====== 7.6) Start presence heartbeat (write-only) ======
-      try {
-        if (!window.__PRESENCE_HEARTBEAT_STARTED__) {
-          window.__PRESENCE_HEARTBEAT_STARTED__ = true;
-          // Call once immediately
-          if (typeof window.presenceHeartbeatOnce === "function") {
-            setTimeout(() => {
-              window.presenceHeartbeatOnce?.();
-            }, 200);
-          }
-          // Set up interval (every 20 seconds)
-          setInterval(() => {
-            if (typeof window.presenceHeartbeatOnce === "function") {
-              window.presenceHeartbeatOnce?.();
-            }
-          }, 20000);
-        }
-      } catch (err) {
-        console.warn("[app_init] presence heartbeat error (non-fatal):", err.message);
-      }
-
       // ====== 8) 強制重新綁定 Check 按鈕（確保 click handler 一定接上） ======
       setTimeout(function forceBindCheckButton(){
         // ✅ DISABLED: Check binding handled in custom_rules.js
@@ -197,6 +176,22 @@ console.log("✅ [19] app_init loaded");
         //   }
         // }, true);
       }, 600); // 在綁定按鈕之後執行
+
+      // ====== 10) Start presence heartbeat (write-only) ======
+      if (!window.__PRESENCE_HEARTBEAT_STARTED__) {
+        window.__PRESENCE_HEARTBEAT_STARTED__ = true;
+        console.log("[PRESENCE][INIT] heartbeat started");
+        // Call once immediately
+        if (typeof window.presenceHeartbeatOnce === "function") {
+          window.presenceHeartbeatOnce();
+        }
+        // Set up interval (every 20 seconds)
+        setInterval(() => {
+          if (typeof window.presenceHeartbeatOnce === "function") {
+            window.presenceHeartbeatOnce();
+          }
+        }, 20000);
+      }
 
     } catch (err) {
       window.showErr?.(err);
