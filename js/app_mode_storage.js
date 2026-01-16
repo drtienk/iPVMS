@@ -22,6 +22,23 @@ console.log("✅ [09] app_mode_storage loaded");
   function saveToLocalByMode(mode){
     try {
       getStore()?.saveToLocalByMode?.(mode, window.sheets);
+      
+      // Trigger sync entrypoint (non-fatal, log only)
+      try {
+        if (typeof window.syncCellChange === "function") {
+          console.log("[SYNC][HOOK] saveToLocalByMode -> syncCellChange", { mode, key: window.activeKey });
+          window.syncCellChange({
+            reason: "local-autosave",
+            mode: mode,
+            key: window.activeKey,
+            companyId: window.documentMeta?.companyId || window.companyScopeKey?.(),
+            ts: new Date().toISOString()
+          });
+        }
+      } catch (syncErr) {
+        // Non-fatal: sync failure should not break local save
+        console.warn("[SYNC][HOOK] syncCellChange error (non-fatal):", syncErr.message);
+      }
     } catch (err) {
       window.showErr?.(err);
     }
