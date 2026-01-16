@@ -185,6 +185,50 @@ window.cloudModelCompanyTryReadOnce = async function cloudModelCompanyTryReadOnc
         const cloudRowCount = Array.isArray(companySheetFromCloud.data) ? companySheetFromCloud.data.length : 0;
         console.log("[DIAG][CLOUD][READ][COMPANY] BEFORE Object.assign", { marker, fpBefore, cloudLen, cloudRowCount });
 
+        // Guard: Skip if cloud data is stale/empty compared to current in-memory data
+        const currentLen = (window.sheets && window.sheets.company) ? JSON.stringify(window.sheets.company).length : 0;
+        const currentRowCount = Array.isArray(window.sheets.company?.data) ? window.sheets.company.data.length : 0;
+
+        // Guard rules (apply in order)
+        if (!companySheetFromCloud || companySheetFromCloud === null || companySheetFromCloud === undefined) {
+          console.warn("[CLOUD][READ][COMPANY] SKIP apply (stale/empty)", {
+            marker, cloudLen: 0, currentLen, cloudRowCount: 0, currentRowCount, reason: "null_or_undefined"
+          });
+          return done({
+            ok: true,
+            step: "skip_apply_stale",
+            companyId: companyIdStr,
+            id: cloudId,
+            reason: "null_or_undefined"
+          });
+        }
+
+        if (cloudRowCount === 0) {
+          console.warn("[CLOUD][READ][COMPANY] SKIP apply (stale/empty)", {
+            marker, cloudLen, currentLen, cloudRowCount: 0, currentRowCount, reason: "cloudRowCount_zero"
+          });
+          return done({
+            ok: true,
+            step: "skip_apply_stale",
+            companyId: companyIdStr,
+            id: cloudId,
+            reason: "cloudRowCount_zero"
+          });
+        }
+
+        if (cloudLen < currentLen) {
+          console.warn("[CLOUD][READ][COMPANY] SKIP apply (stale/empty)", {
+            marker, cloudLen, currentLen, cloudRowCount, currentRowCount, reason: "cloudLen_smaller"
+          });
+          return done({
+            ok: true,
+            step: "skip_apply_stale",
+            companyId: companyIdStr,
+            id: cloudId,
+            reason: "cloudLen_smaller"
+          });
+        }
+
         Object.assign(window.sheets.company, companySheetFromCloud);
 
         const fpAfter = fpCompany();
