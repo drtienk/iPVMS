@@ -163,13 +163,21 @@ window.presenceReadOnce = async function presenceReadOnce() {
       }
     }
 
+    // Compute boolean for UI
+    const otherActive = otherActiveCount > 0;
+
     // Log result with improved format
-    if (otherActiveCount > 0) {
+    if (otherActive) {
       const ageInfo = newestOtherAgeSec !== null ? ` newestOtherAge=${newestOtherAgeSec}s` : "";
       console.log(`[PRESENCE][READ] other active = true (count=${otherActiveCount}${ageInfo} threshold=${PRESENCE_ACTIVE_WINDOW_SEC}s)`);
     } else {
       const ageInfo = newestOtherAgeSec !== null ? ` newestOtherAge=${newestOtherAgeSec}s` : " newestOtherAge=null";
       console.log(`[PRESENCE][READ] other active = false (${ageInfo} threshold=${PRESENCE_ACTIVE_WINDOW_SEC}s)`);
+    }
+
+    // Wire banner to presence read result
+    if (typeof window.presenceBannerSet === "function") {
+      window.presenceBannerSet(otherActive);
     }
   } catch (err) {
     // Never throw; catch all errors
