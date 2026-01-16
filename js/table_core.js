@@ -201,6 +201,24 @@ window.DEFS.TABLE_CORE = window.DEFS.TABLE_CORE || {};
 
         ensureSize(s);
         s.data[r][c] = tEl.textContent ?? "";
+        
+        // Trigger sync entrypoint (non-fatal, log only)
+        try {
+          if (typeof window.syncCellChange === "function") {
+            window.syncCellChange({
+              reason: "cell-input",
+              mode: ctx.activeMode,
+              key: (ctx && ctx.activeKey) ? ctx.activeKey : window.activeKey,
+              companyId: window.documentMeta?.companyId || window.companyScopeKey?.(),
+              row: r,
+              col: c,
+              value: s.data[r][c]
+            });
+          }
+        } catch (err) {
+          console.warn("[SYNC][CELL] non-fatal", err);
+        }
+        
         if (typeof ctx.saveToLocalByMode === "function") ctx.saveToLocalByMode(ctx.activeMode);
 
         // ✅ 保險：每次輸入也同步一次（不影響功能）
