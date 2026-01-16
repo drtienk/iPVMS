@@ -44,6 +44,8 @@ window.presenceHeartbeatOnce = async function presenceHeartbeatOnce() {
     const payload = {
       company_id: companyId,
       instance_id: window.__PRESENCE_INSTANCE_ID__,
+      active_mode: window.activeMode || "model",
+      active_key: window.activeKey || "",
       ts: new Date().toISOString(),
       source: "heartbeat"
     };
@@ -118,7 +120,11 @@ window.presenceReadOnce = async function presenceReadOnce() {
     // Parse rows and check for other active instances
     const now = Date.now();
     const thresholdMs = PRESENCE_ACTIVE_WINDOW_SEC * 1000;
-    let otherActiveCount = 0;
+    const currentMode = window.activeMode || "model";
+    const currentKey = window.activeKey || "";
+    
+    let otherActiveAnyCount = 0;
+    let otherActiveSameContextCount = 0;
     let newestOtherAgeSec = null; // Only track "other" instances, not self
 
     for (const row of data) {
@@ -153,7 +159,14 @@ window.presenceReadOnce = async function presenceReadOnce() {
 
             // Count if within threshold
             if (ageMs <= thresholdMs) {
-              otherActiveCount++;
+              otherActiveAnyCount++;
+              
+              // Check if same context (same active_mode and active_key)
+              const rowMode = payload.active_mode || "model";
+              const rowKey = payload.active_key || "";
+              if (rowMode === currentMode && rowKey === currentKey) {
+                otherActiveSameContextCount++;
+              }
             }
           }
         }
@@ -163,21 +176,16 @@ window.presenceReadOnce = async function presenceReadOnce() {
       }
     }
 
-    // Compute boolean for UI
-    const otherActive = otherActiveCount > 0;
+    // Compute two booleans
+    const otherActiveAny = otherActiveAnyCount > 0;
+    const otherActiveSameContext = otherActiveSameContextCount > 0;
 
-    // Log result with improved format
-    if (otherActive) {
-      const ageInfo = newestOtherAgeSec !== null ? ` newestOtherAge=${newestOtherAgeSec}s` : "";
-      console.log(`[PRESENCE][READ] other active = true (count=${otherActiveCount}${ageInfo} threshold=${PRESENCE_ACTIVE_WINDOW_SEC}s)`);
-    } else {
-      const ageInfo = newestOtherAgeSec !== null ? ` newestOtherAge=${newestOtherAgeSec}s` : " newestOtherAge=null";
-      console.log(`[PRESENCE][READ] other active = false (${ageInfo} threshold=${PRESENCE_ACTIVE_WINDOW_SEC}s)`);
-    }
+    // Log result with unambiguous format
+    console.log(`[PRESENCE][READ] otherAny=${otherActiveAny} otherSame=${otherActiveSameContext} countSame=${otherActiveSameContextCount}`);
 
-    // Wire banner to presence read result
+    // Wire banner to presence read result (based on SAME CONTEXT only)
     if (typeof window.presenceBannerSet === "function") {
-      window.presenceBannerSet(otherActive);
+      window.presenceBannerSet(otherActiveSameContext);
     }
   } catch (err) {
     // Never throw; catch all errors

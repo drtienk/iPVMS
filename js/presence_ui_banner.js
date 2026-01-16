@@ -3,8 +3,8 @@ console.log("✅ [presence_ui_banner] loaded");
 
 // Define bilingual text constants
 const PRESENCE_TEXT = {
-  en: "Someone else is using this workspace.",
-  zh: "有人正在使用這個工作區。"
+  en: "Someone else is viewing this sheet.",
+  zh: "有人正在查看這張表。"
 };
 
 // Helper function to get language key
@@ -132,20 +132,10 @@ window.presenceBannerSet = function presenceBannerSet(isOtherActive) {
         if (bannerRetry) {
           // Update text before showing
           const k = getLangKey();
-          bannerRetry.textContent = (k === "en") ? "Someone else is using this workspace." : "有人正在使用這個工作區。";
+          bannerRetry.textContent = (k === "en") ? "Someone else is viewing this sheet." : "有人正在查看這張表。";
           bannerRetry.style.display = isOtherActive ? "block" : "none";
-          // Debug log only when showing banner
-          if (isOtherActive) {
-            let rawValue = null;
-            if (document.documentElement && document.documentElement.lang) {
-              rawValue = document.documentElement.lang;
-            } else {
-              try {
-                rawValue = sessionStorage.getItem("lang") || localStorage.getItem("lang") || window.currentLang || window.lang;
-              } catch (e) {}
-            }
-            console.log("[PRESENCE][BANNER] lang=", k, "raw=", rawValue);
-          }
+          // Debug log every time (lightweight)
+          console.log("[PRESENCE][BANNER] show=", !!isOtherActive);
         }
       }, 10);
       return;
@@ -153,24 +143,14 @@ window.presenceBannerSet = function presenceBannerSet(isOtherActive) {
 
     // Update banner text dynamically before showing (language may have changed)
     const k = getLangKey();
-    banner.textContent = (k === "en") ? "Someone else is using this workspace." : "有人正在使用這個工作區。";
+    banner.textContent = (k === "en") ? "Someone else is viewing this sheet." : "有人正在查看這張表。";
 
     // If isOtherActive === true: show banner
     // Else: hide banner
     banner.style.display = isOtherActive ? "block" : "none";
     
-    // Debug log only when showing banner (to avoid spam)
-    if (isOtherActive) {
-      let rawValue = null;
-      if (document.documentElement && document.documentElement.lang) {
-        rawValue = document.documentElement.lang;
-      } else {
-        try {
-          rawValue = sessionStorage.getItem("lang") || localStorage.getItem("lang") || window.currentLang || window.lang;
-        } catch (e) {}
-      }
-      console.log("[PRESENCE][BANNER] lang=", k, "raw=", rawValue);
-    }
+    // Debug log every time (lightweight)
+    console.log("[PRESENCE][BANNER] show=", !!isOtherActive);
   } catch (err) {
     // Must not throw
     console.warn("[presence_ui_banner] set error:", err.message);
