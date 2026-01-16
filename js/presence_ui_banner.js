@@ -7,23 +7,60 @@ const PRESENCE_TEXT = {
   zh: "有人正在使用這個工作區。"
 };
 
-// Helper function to detect current language safely
-function detectCurrentLang() {
-  // Determine language in this order (safe checks)
-  let langValue = null;
+// Helper function to get language key
+function getLangKey() {
+  let rawValue = null;
   
-  if (typeof window.currentLang !== "undefined" && window.currentLang) {
-    langValue = String(window.currentLang);
-  } else if (typeof window.lang !== "undefined" && window.lang) {
-    langValue = String(window.lang);
-  } else {
-    // Default to "zh"
+  // Determine language in this priority order (first non-empty wins)
+  // 1. document.documentElement.lang
+  if (document.documentElement && document.documentElement.lang) {
+    rawValue = document.documentElement.lang;
+  }
+  
+  // 2. sessionStorage.getItem("lang")
+  if (!rawValue) {
+    try {
+      const sessionLang = sessionStorage.getItem("lang");
+      if (sessionLang) {
+        rawValue = sessionLang;
+      }
+    } catch (e) {
+      // Ignore storage errors
+    }
+  }
+  
+  // 3. localStorage.getItem("lang")
+  if (!rawValue) {
+    try {
+      const localLang = localStorage.getItem("lang");
+      if (localLang) {
+        rawValue = localLang;
+      }
+    } catch (e) {
+      // Ignore storage errors
+    }
+  }
+  
+  // 4. window.currentLang
+  if (!rawValue && typeof window.currentLang !== "undefined" && window.currentLang) {
+    rawValue = window.currentLang;
+  }
+  
+  // 5. window.lang
+  if (!rawValue && typeof window.lang !== "undefined" && window.lang) {
+    rawValue = window.lang;
+  }
+  
+  // 6. default "zh"
+  if (!rawValue) {
     return "zh";
   }
   
-  // Treat as English if value starts with "en", Chinese otherwise
-  const langLower = langValue.toLowerCase();
-  if (langLower.startsWith("en")) {
+  // Normalize: Convert to string, trim, lowercase
+  const normalized = String(rawValue).trim().toLowerCase();
+  
+  // If it starts with "en" → return "en", else return "zh"
+  if (normalized.startsWith("en")) {
     return "en";
   } else {
     return "zh";
@@ -47,7 +84,7 @@ window.presenceBannerEnsure = function presenceBannerEnsure() {
     banner.style.cssText = "position: fixed; top: 0; left: 0; right: 0; padding: 8px 12px; font-size: 12px; background: #111827; color: #fff; z-index: 99998; display: none; text-align: center;";
     
     // Set banner text dynamically based on current language
-    const langKey = detectCurrentLang();
+    const langKey = getLangKey();
     banner.textContent = PRESENCE_TEXT[langKey] || PRESENCE_TEXT.zh;
 
     // Append to body
@@ -94,21 +131,46 @@ window.presenceBannerSet = function presenceBannerSet(isOtherActive) {
         const bannerRetry = document.getElementById("presenceBanner");
         if (bannerRetry) {
           // Update text before showing
-          const langKey = detectCurrentLang();
-          bannerRetry.textContent = PRESENCE_TEXT[langKey] || PRESENCE_TEXT.zh;
+          const k = getLangKey();
+          bannerRetry.textContent = (k === "en") ? "Someone else is using this workspace." : "有人正在使用這個工作區。";
           bannerRetry.style.display = isOtherActive ? "block" : "none";
+          // Debug log only when showing banner
+          if (isOtherActive) {
+            let rawValue = null;
+            if (document.documentElement && document.documentElement.lang) {
+              rawValue = document.documentElement.lang;
+            } else {
+              try {
+                rawValue = sessionStorage.getItem("lang") || localStorage.getItem("lang") || window.currentLang || window.lang;
+              } catch (e) {}
+            }
+            console.log("[PRESENCE][BANNER] lang=", k, "raw=", rawValue);
+          }
         }
       }, 10);
       return;
     }
 
     // Update banner text dynamically before showing (language may have changed)
-    const langKey = detectCurrentLang();
-    banner.textContent = PRESENCE_TEXT[langKey] || PRESENCE_TEXT.zh;
+    const k = getLangKey();
+    banner.textContent = (k === "en") ? "Someone else is using this workspace." : "有人正在使用這個工作區。";
 
     // If isOtherActive === true: show banner
     // Else: hide banner
     banner.style.display = isOtherActive ? "block" : "none";
+    
+    // Debug log only when showing banner (to avoid spam)
+    if (isOtherActive) {
+      let rawValue = null;
+      if (document.documentElement && document.documentElement.lang) {
+        rawValue = document.documentElement.lang;
+      } else {
+        try {
+          rawValue = sessionStorage.getItem("lang") || localStorage.getItem("lang") || window.currentLang || window.lang;
+        } catch (e) {}
+      }
+      console.log("[PRESENCE][BANNER] lang=", k, "raw=", rawValue);
+    }
   } catch (err) {
     // Must not throw
     console.warn("[presence_ui_banner] set error:", err.message);
