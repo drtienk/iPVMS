@@ -195,6 +195,21 @@ console.log("✅ [19] app_init loaded");
         }, 20000);
       }
 
+      // ====== 11) Start presence read polling ======
+      if (!window.__PRESENCE_READ_STARTED__) {
+        window.__PRESENCE_READ_STARTED__ = true;
+        // Call once immediately
+        if (typeof window.presenceReadOnce === "function") {
+          window.presenceReadOnce();
+        }
+        // Set up interval (every 25 seconds)
+        window.__PRESENCE_READ_TIMER__ = setInterval(() => {
+          if (typeof window.presenceReadOnce === "function") {
+            window.presenceReadOnce();
+          }
+        }, 25000);
+      }
+
     } catch (err) {
       window.showErr?.(err);
     }

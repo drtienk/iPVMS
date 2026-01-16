@@ -1,6 +1,16 @@
 // === cloud_presence_heartbeat.js - Presence heartbeat write-only helper ===
 console.log("✅ [cloud_presence_heartbeat] loaded");
 
+// Generate and store instance ID once per tab (reload-safe)
+if (!window.__PRESENCE_INSTANCE_ID__) {
+  if (typeof crypto !== "undefined" && crypto.randomUUID) {
+    window.__PRESENCE_INSTANCE_ID__ = crypto.randomUUID();
+  } else {
+    // Fallback: generate random string
+    window.__PRESENCE_INSTANCE_ID__ = "inst_" + Date.now() + "_" + Math.random().toString(36).substr(2, 9);
+  }
+}
+
 // Export / attach one function only: window.presenceHeartbeatOnce()
 window.presenceHeartbeatOnce = async function presenceHeartbeatOnce() {
   try {
@@ -11,21 +21,31 @@ window.presenceHeartbeatOnce = async function presenceHeartbeatOnce() {
     }
 
     // Get company_id from sessionStorage
-    const companyId = sessionStorage.getItem("companyId");
+    const companyId = (sessionStorage.getItem("companyId") || "").trim();
     if (!companyId) {
       console.log("[PRESENCE][WRITE] companyId not found in sessionStorage, skipping");
       return;
     }
 
-    // Build minimal payload
+    // Ensure instance ID exists
+    if (!window.__PRESENCE_INSTANCE_ID__) {
+      if (typeof crypto !== "undefined" && crypto.randomUUID) {
+        window.__PRESENCE_INSTANCE_ID__ = crypto.randomUUID();
+      } else {
+        window.__PRESENCE_INSTANCE_ID__ = "inst_" + Date.now() + "_" + Math.random().toString(36).substr(2, 9);
+      }
+    }
+
+    // Build minimal payload (include instance_id for multi-window detection)
     const payload = {
       company_id: companyId,
+      instance_id: window.__PRESENCE_INSTANCE_ID__,
       ts: new Date().toISOString(),
       source: "heartbeat"
     };
 
-    // Use deterministic id: presence_<companyId>
-    const recordId = `presence_${companyId}`;
+    // Use deterministic id: presence_<companyId>_<instanceId> (each window has own row)
+    const recordId = `presence_${companyId}_${window.__PRESENCE_INSTANCE_ID__}`;
 
     // Write to Supabase using upsert (table: cloud_status)
     const { error } = await window.SB
@@ -46,5 +66,107 @@ window.presenceHeartbeatOnce = async function presenceHeartbeatOnce() {
   } catch (err) {
     // Must never throw (catch all errors)
     console.log("[PRESENCE][WRITE] error:", err.message);
+  }
+};
+
+// Add read function: window.presenceReadOnce()
+window.presenceReadOnce = async function presenceReadOnce() {
+  try {
+    // Never throw; catch all errors
+    if (!window.SB) {
+      console.log("[PRESENCE][READ] SB missing");
+      return;
+    }
+
+    // Determine companyId
+    const companyId = (sessionStorage.getItem("companyId") || "").trim();
+    if (!companyId) {
+      console.log("[PRESENCE][READ] missing companyId");
+      return;
+    }
+
+    // Ensure instance ID exists
+    if (!window.__PRESENCE_INSTANCE_ID__) {
+      if (typeof crypto !== "undefined" && crypto.randomUUID) {
+        window.__PRESENCE_INSTANCE_ID__ = crypto.randomUUID();
+      } else {
+        window.__PRESENCE_INSTANCE_ID__ = "inst_" + Date.now() + "_" + Math.random().toString(36).substr(2, 9);
+      }
+    }
+
+    // Query cloud_status for presence records for this company
+    // Select all columns to handle unknown timestamp column
+    const { data, error } = await window.SB
+      .from("cloud_status")
+      .select("*")
+      .like("id", `presence_${companyId}_%`);
+
+    if (error) {
+      console.log("[PRESENCE][READ] error:", error.message);
+      return;
+    }
+
+    if (!data || data.length === 0) {
+      console.log("[PRESENCE][READ] other active = false");
+      return;
+    }
+
+    // Parse rows and check for other active instances
+    const now = Date.now();
+    const thresholdMs = 45000; // 45 seconds
+    let otherActiveCount = 0;
+    let newestTsAge = null;
+
+    for (const row of data) {
+      try {
+        const payload = typeof row.payload === "string" ? JSON.parse(row.payload) : row.payload;
+        
+        // Check if source is heartbeat (if source exists)
+        if (payload.source && payload.source !== "heartbeat") {
+          continue;
+        }
+
+        // Extract timestamp (try ts first, then updated_at, then parse from row)
+        let tsMs = null;
+        if (payload.ts) {
+          tsMs = new Date(payload.ts).getTime();
+        } else if (payload.updated_at) {
+          tsMs = new Date(payload.updated_at).getTime();
+        } else if (row.updated_at) {
+          tsMs = new Date(row.updated_at).getTime();
+        }
+
+        if (tsMs && !isNaN(tsMs)) {
+          const ageMs = now - tsMs;
+          const ageSec = Math.floor(ageMs / 1000);
+
+          // Track newest timestamp age
+          if (newestTsAge === null || ageSec < newestTsAge) {
+            newestTsAge = ageSec;
+          }
+
+          // Check if this is another instance (not current window) and within threshold
+          if (payload.instance_id && payload.instance_id !== window.__PRESENCE_INSTANCE_ID__) {
+            if (ageMs <= thresholdMs) {
+              otherActiveCount++;
+            }
+          }
+        }
+      } catch (parseErr) {
+        // Skip rows that can't be parsed
+        continue;
+      }
+    }
+
+    // Log result
+    if (otherActiveCount > 0) {
+      console.log(`[PRESENCE][READ] other active = true (count=${otherActiveCount})`);
+    } else {
+      const ageInfo = newestTsAge !== null ? ` (newest=${newestTsAge}s)` : "";
+      console.log(`[PRESENCE][READ] other active = false${ageInfo}`);
+    }
+  } catch (err) {
+    // Never throw; catch all errors
+    console.log("[PRESENCE][READ] error:", err.message);
   }
 };
