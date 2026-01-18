@@ -29,6 +29,22 @@ window.DEFS.ROUTER = window.DEFS.ROUTER || {};
     const prevKey = activeKey;
     activeKey = nextKey;
 
+    // Save activeKey to sessionStorage based on mode
+    if (activeMode === "period") {
+      try {
+        sessionStorage.setItem("lastActiveKey_period", nextKey);
+        console.log("[PERIOD][ACTIVE_SHEET]", nextKey);
+      } catch (e) {
+        console.warn("[PERIOD][ACTIVE_SHEET] failed to save", e);
+      }
+    } else if (activeMode === "model") {
+      try {
+        sessionStorage.setItem("lastActiveKey_model", nextKey);
+      } catch (e) {
+        console.warn("[MODEL][ACTIVE_SHEET] failed to save", e);
+      }
+    }
+
     // Immediately write presence heartbeat if activeKey changed
     if (prevKey !== nextKey) {
       if (typeof window.presenceHeartbeatOnce === "function") {
