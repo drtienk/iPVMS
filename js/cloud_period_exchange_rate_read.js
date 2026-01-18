@@ -43,7 +43,7 @@ window.cloudPeriodExchangeRateTryReadOnce = async function cloudPeriodExchangeRa
     try {
       const { data: rowData, error: readError } = await window.SB
         .from("cloud_status")
-        .select("payload")
+        .select("payload, updated_at")
         .eq("id", cloudId)
         .maybeSingle();
 
@@ -66,6 +66,7 @@ window.cloudPeriodExchangeRateTryReadOnce = async function cloudPeriodExchangeRa
           readError.message?.includes("JSON object requested, multiple (or no) rows returned");
 
         if (isNoRowError) {
+          console.log("[CLOUD][READ][PERIOD][EXCHANGE_RATE] found=false (no_row)");
           return done({ 
             ok: false, 
             step: "no_data", 
@@ -103,6 +104,7 @@ window.cloudPeriodExchangeRateTryReadOnce = async function cloudPeriodExchangeRa
 
       // Check if row exists and has payload
       if (!rowData || !rowData.payload) {
+        console.log("[CLOUD][READ][PERIOD][EXCHANGE_RATE] found=false (empty_payload)");
         return done({ 
           ok: false, 
           step: "no_data", 
@@ -114,6 +116,7 @@ window.cloudPeriodExchangeRateTryReadOnce = async function cloudPeriodExchangeRa
 
       const payloadStr = String(rowData.payload).trim();
       if (payloadStr === "") {
+        console.log("[CLOUD][READ][PERIOD][EXCHANGE_RATE] found=false (empty_payload_string)");
         return done({ 
           ok: false, 
           step: "no_data", 
@@ -247,12 +250,29 @@ window.cloudPeriodExchangeRateTryReadOnce = async function cloudPeriodExchangeRa
         return merged;
       }
 
+      // Check if local sheet has any non-empty cells
+      function hasNonEmptyLocalCells(sheet) {
+        if (!sheet || !Array.isArray(sheet.data)) return false;
+        for (let r = 0; r < sheet.data.length; r++) {
+          const row = sheet.data[r];
+          if (!Array.isArray(row)) continue;
+          for (let c = 0; c < row.length; c++) {
+            const cellValue = String(row[c] || "").trim();
+            if (cellValue !== "") return true;
+          }
+        }
+        return false;
+      }
+
       // Apply cloud data to in-memory sheets
       try {
         const fpBefore = fpExchangeRate();
         const cloudLen = JSON.stringify(exchangeRateSheetFromCloud).length;
         const cloudRowCount = Array.isArray(exchangeRateSheetFromCloud.data) ? exchangeRateSheetFromCloud.data.length : 0;
-        console.log("[CLOUD][READ][PERIOD][EXCHANGE_RATE] BEFORE merge", { marker, fpBefore, cloudLen, cloudRowCount });
+        const cloudUpdatedAt = rowData.updated_at ? new Date(rowData.updated_at).getTime() : null;
+        const localHasNonEmpty = hasNonEmptyLocalCells(window.sheets.exchange_rate);
+        
+        console.log("[CLOUD][READ][PERIOD][EXCHANGE_RATE] BEFORE merge", { marker, fpBefore, cloudLen, cloudRowCount, cloudUpdatedAt, localHasNonEmpty });
 
         // Guard: Skip if cloud data is stale/empty compared to current in-memory data
         const currentLen = (window.sheets && window.sheets.exchange_rate) ? JSON.stringify(window.sheets.exchange_rate).length : 0;
@@ -260,9 +280,7 @@ window.cloudPeriodExchangeRateTryReadOnce = async function cloudPeriodExchangeRa
 
         // Guard rules (apply in order)
         if (!exchangeRateSheetFromCloud || exchangeRateSheetFromCloud === null || exchangeRateSheetFromCloud === undefined) {
-          console.warn("[CLOUD][READ][PERIOD][EXCHANGE_RATE] SKIP apply (stale/empty)", {
-            marker, cloudLen: 0, currentLen, cloudRowCount: 0, currentRowCount, reason: "null_or_undefined"
-          });
+          console.log("[CLOUD][READ][PERIOD][EXCHANGE_RATE] found=false (null_or_undefined)");
           return done({
             ok: true,
             step: "skip_apply_stale",
@@ -273,9 +291,7 @@ window.cloudPeriodExchangeRateTryReadOnce = async function cloudPeriodExchangeRa
         }
 
         if (cloudRowCount === 0) {
-          console.warn("[CLOUD][READ][PERIOD][EXCHANGE_RATE] SKIP apply (stale/empty)", {
-            marker, cloudLen, currentLen, cloudRowCount: 0, currentRowCount, reason: "cloudRowCount_zero"
-          });
+          console.log("[CLOUD][READ][PERIOD][EXCHANGE_RATE] found=false (cloudRowCount_zero)");
           return done({
             ok: true,
             step: "skip_apply_stale",
@@ -285,22 +301,40 @@ window.cloudPeriodExchangeRateTryReadOnce = async function cloudPeriodExchangeRa
           });
         }
 
-        if (cloudLen < currentLen && currentLen > 0) {
-          console.warn("[CLOUD][READ][PERIOD][EXCHANGE_RATE] SKIP apply (stale/empty)", {
-            marker, cloudLen, currentLen, cloudRowCount, currentRowCount, reason: "cloudLen_smaller"
-          });
-          return done({
-            ok: true,
-            step: "skip_apply_stale",
-            companyId: companyIdStr,
-            id: cloudId,
-            reason: "cloudLen_smaller"
-          });
+        // Strict guard: If local has non-empty cells, only apply cloud if it's clearly newer (using updated_at if available)
+        if (localHasNonEmpty) {
+          // If cloud has updated_at, check if it's recent (within last 5 minutes) - assume it's newer
+          // Otherwise, use conservative merge (only fill empty cells)
+          const now = Date.now();
+          const fiveMinutesAgo = now - (5 * 60 * 1000);
+          const shouldApplyCloud = cloudUpdatedAt && cloudUpdatedAt > fiveMinutesAgo;
+          
+          if (!shouldApplyCloud) {
+            // Use conservative merge: only fill empty cells, never overwrite non-empty local cells
+            console.log("[CLOUD][READ][PERIOD][EXCHANGE_RATE] found=true (conservative merge, local has data)");
+            const merged = conservativeMerge(window.sheets.exchange_rate, exchangeRateSheetFromCloud);
+            Object.assign(window.sheets.exchange_rate, merged);
+          } else {
+            // Cloud is clearly newer (recent updated_at), but still use conservative merge for safety
+            console.log("[CLOUD][READ][PERIOD][EXCHANGE_RATE] found=true (cloud newer, conservative merge)");
+            const merged = conservativeMerge(window.sheets.exchange_rate, exchangeRateSheetFromCloud);
+            Object.assign(window.sheets.exchange_rate, merged);
+          }
+        } else {
+          // Local is empty, safe to apply cloud
+          if (cloudLen < currentLen && currentLen > 0) {
+            console.log("[CLOUD][READ][PERIOD][EXCHANGE_RATE] found=false (cloudLen_smaller)");
+            return done({
+              ok: true,
+              step: "skip_apply_stale",
+              companyId: companyIdStr,
+              id: cloudId,
+              reason: "cloudLen_smaller"
+            });
+          }
+          console.log("[CLOUD][READ][PERIOD][EXCHANGE_RATE] found=true (local empty, apply cloud)");
+          Object.assign(window.sheets.exchange_rate, exchangeRateSheetFromCloud);
         }
-
-        // Conservative merge: only fill empty cells, never overwrite non-empty local cells
-        const merged = conservativeMerge(window.sheets.exchange_rate, exchangeRateSheetFromCloud);
-        Object.assign(window.sheets.exchange_rate, merged);
 
         const fpAfter = fpExchangeRate();
         console.log("[CLOUD][READ][PERIOD][EXCHANGE_RATE] AFTER merge", { marker, fpBefore, fpAfter });
@@ -331,13 +365,7 @@ window.cloudPeriodExchangeRateTryReadOnce = async function cloudPeriodExchangeRa
         console.warn("[CLOUD][READ][PERIOD][EXCHANGE_RATE] post:render_fail", { marker }, e);
       }
 
-      // Log success
-      console.log("[CLOUD][READ][PERIOD][EXCHANGE_RATE] applied cloud data", { 
-        marker, 
-        companyId: companyIdStr, 
-        id: cloudId, 
-        bytes: payloadStr.length 
-      });
+      // Log success (already logged above with found=true/false)
 
       return done({ 
         ok: true, 

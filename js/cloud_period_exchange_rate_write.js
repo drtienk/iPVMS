@@ -85,10 +85,7 @@ window.cloudPeriodExchangeRateWriteOnce = async function cloudPeriodExchangeRate
       }
 
       // Success
-      console.log("[CLOUD][WRITE][PERIOD][EXCHANGE_RATE] ok", { 
-        companyId: companyIdStr, 
-        id: cloudId 
-      });
+      console.log("[CLOUD][WRITE][PERIOD][EXCHANGE_RATE] ok id=" + cloudId);
 
       return { ok: true };
 
