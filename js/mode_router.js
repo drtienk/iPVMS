@@ -91,63 +91,6 @@ window.DEFS.ROUTER = window.DEFS.ROUTER || {};
 
     on("newPeriodBtn","click", () => (typeof openPeriodModal === "function") && openPeriodModal());
 
-    // Period ID selector (P1/P2/P3) for Step 7
-    on("periodSelector","change", () => {
-      const sel = $id("periodSelector");
-      const newPeriodId = sel ? String(sel.value || "").trim() : "";
-      if (!newPeriodId || !["P1", "P2", "P3"].includes(newPeriodId)) return;
-
-      const prevPeriodId = (typeof window.getActivePeriodId === "function") ? window.getActivePeriodId() : "";
-      
-      console.log("[PERIOD][SWITCH]", { from: prevPeriodId || "(none)", to: newPeriodId });
-
-      // 1) Save current work
-      if (activeMode === "period") {
-        if (typeof saveToLocalByMode === "function") {
-          saveToLocalByMode("period");
-        }
-      }
-
-      // 2) Set new periodId
-      if (typeof window.setActivePeriodId === "function") {
-        window.setActivePeriodId(newPeriodId);
-      }
-
-      // Log storage key
-      const storageKey = (typeof storageKeyByMode === "function") ? storageKeyByMode("period") : "";
-      console.log("[PERIOD][KEY]", storageKey);
-
-      // 3) Load new period data
-      if (activeMode === "period") {
-        try { for (const k in sheets) sheets[k].data = []; } catch {}
-        if (typeof loadFromLocalByMode === "function") {
-          loadFromLocalByMode("period");
-        }
-
-        // If no data exists, reset to blank
-        const raw = localStorage.getItem(storageKey || "");
-        if (!raw && typeof resetSheetsToBlankForMode === "function") {
-          resetSheetsToBlankForMode("period");
-          if (typeof saveToLocalByMode === "function") {
-            saveToLocalByMode("period");
-          }
-        }
-      }
-
-      // 4) Re-apply defs and render
-      if (typeof applySheetDefsByModeAndTrim === "function") {
-        applySheetDefsByModeAndTrim();
-      }
-
-      activeKey = "company";
-      if (typeof ensureActiveKeyVisible === "function") {
-        ensureActiveKeyVisible();
-      }
-
-      refreshUI();
-      setActive(activeKey);
-    });
-
     on("periodSelect","change", () => {
       const sel = $id("periodSelect");
       const p = sel ? sel.value : "";
@@ -202,18 +145,6 @@ window.DEFS.ROUTER = window.DEFS.ROUTER || {};
 
   window.addEventListener("DOMContentLoaded", () => {
     bindEvents();
-    
-    // Initialize periodSelector (P1/P2/P3) from sessionStorage
-    const periodSel = $id("periodSelector");
-    if (periodSel && typeof window.getActivePeriodId === "function") {
-      const currentPeriodId = window.getActivePeriodId() || "P1";
-      periodSel.value = currentPeriodId;
-      // Set default to P1 if not set
-      if (!window.getActivePeriodId()) {
-        window.setActivePeriodId("P1");
-      }
-    }
-    
     try { refreshUI(); } catch {}
   });
 
