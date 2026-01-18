@@ -28,6 +28,7 @@ window.DEFS.ROUTER = window.DEFS.ROUTER || {};
     // Check if activeKey actually changed
     const prevKey = activeKey;
     activeKey = nextKey;
+    window.activeKey = nextKey; // ✅ Sync window.activeKey for toolbar_ops.js and other modules
 
     // Save activeKey to sessionStorage based on mode
     if (activeMode === "period") {
