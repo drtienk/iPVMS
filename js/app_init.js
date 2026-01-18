@@ -148,11 +148,6 @@ console.log("✅ [19] app_init loaded");
       // safety: ensure first paint
       if (typeof window.render === "function") window.render();
 
-      // ====== 7.4) Bind cloud save delegate (event delegation on stable toolbar container) ======
-      if (typeof window.bindCloudSaveDelegateOnce === "function") {
-        window.bindCloudSaveDelegateOnce();
-      }
-
       // ====== 7.5) Try cloud read once (after initial render) ======
       try {
         if (!window.__CLOUD_COMPANY_READ_ONCE__) {
