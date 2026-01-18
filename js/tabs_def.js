@@ -10,7 +10,7 @@ window.DEFS.TABS = window.DEFS.TABS || {};
 ========================================================= */
 
 window.DEFS.TABS.TAB_CONFIG = [
-  { id:"tabCompany", key:"company", enModel:"Company", zhModel:"公司", enPeriod:"Exchange Rate", zhPeriod:"匯率" },
+  { id:"tabCompany", key:"company", enModel:"Company", zhModel:"公司", enPeriod:"Company", zhPeriod:"公司" },
   { id:"tabExchangeRate", key:"exchange_rate", enModel:"", zhModel:"", enPeriod:"Exchange Rate", zhPeriod:"匯率", periodOnly:true },
   { id:"tabBU",      key:"bu",      enModel:"Business Unit", zhModel:"事業單位", enPeriod:"Resource", zhPeriod:"資源" },
   { id:"tabCR",      key:"cr",      enModel:"Company Resource", zhModel:"公司資源", enPeriod:"Resource Driver (Activity Center)", zhPeriod:"資源動因（作業中心）" },
