@@ -178,31 +178,6 @@ window.cloudModelCompanyTryReadOnce = async function cloudModelCompanyTryReadOnc
         };
       }
 
-      // PART C: Reusable helper - Check if local sheet has any non-empty data
-      function shouldApplyCloudOverLocal(localSheet, cloudSheet) {
-        if (!localSheet) return true; // No local sheet, allow cloud
-        
-        // Check if local sheet has any rows
-        if (!Array.isArray(localSheet.data) || localSheet.data.length === 0) {
-          return true; // Empty local sheet, allow cloud
-        }
-        
-        // Check if any cell in local sheet has non-empty value
-        for (let r = 0; r < localSheet.data.length; r++) {
-          const row = localSheet.data[r];
-          if (!Array.isArray(row)) continue;
-          
-          for (let c = 0; c < row.length; c++) {
-            const cellValue = String(row[c] || "").trim();
-            if (cellValue !== "") {
-              return false; // Local has data, don't overwrite
-            }
-          }
-        }
-        
-        return true; // Local is completely empty, allow cloud
-      }
-
       // Apply cloud data to in-memory sheets
       try {
         const fpBefore = fpCompany();
@@ -251,20 +226,6 @@ window.cloudModelCompanyTryReadOnce = async function cloudModelCompanyTryReadOnc
             companyId: companyIdStr,
             id: cloudId,
             reason: "cloudLen_smaller"
-          });
-        }
-
-        // PART B: Strict local-newer protection - check if local has any non-empty cell
-        if (!shouldApplyCloudOverLocal(window.sheets.company, companySheetFromCloud)) {
-          console.warn("[CLOUD][READ][COMPANY] SKIP apply (local_has_data)", {
-            marker, cloudLen, currentLen, cloudRowCount, currentRowCount, reason: "local_has_data"
-          });
-          return done({
-            ok: true,
-            step: "skip_apply_stale",
-            companyId: companyIdStr,
-            id: cloudId,
-            reason: "local_has_data"
           });
         }
 
