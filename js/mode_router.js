@@ -28,6 +28,15 @@ window.DEFS.ROUTER = window.DEFS.ROUTER || {};
     // Check if activeKey actually changed
     const prevKey = activeKey;
     activeKey = nextKey;
+    
+    // DIAG: Log activeKey changes
+    console.log("[DIAG][ACTIVE]", { 
+      activeKey: activeKey, 
+      prevKey: prevKey,
+      activeMode: activeMode,
+      allowedKeys: activeMode === "period" ? Object.keys(window.PERIOD_DEF_MAP || window.DEFS?.PERIOD_DEF_MAP || {}) : [],
+      t: Date.now() 
+    });
 
     // Immediately write presence heartbeat if activeKey changed
     if (prevKey !== nextKey) {
