@@ -28,7 +28,6 @@ window.DEFS.TABS_UI = window.DEFS.TABS_UI || {};
 
     // Period mode: Use PERIOD_DEF_MAP as single source of truth
     if (activeMode === "period") {
-      tabBar.innerHTML = "";
       const periodDefMap = window.DEFS?.PERIOD_DEF_MAP || window.PERIOD_DEF_MAP || {};
       const sheetKeys = Object.keys(periodDefMap);
 
