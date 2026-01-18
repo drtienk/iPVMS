@@ -689,58 +689,6 @@ window._syncDelColBtnVisibility = _syncDelColBtnVisibility;
         syncDelColBtnVisibility();
       } catch (err) { showErr(err); }
     });
-
-    // Save to Cloud (Model / Company only)
-    on("btnSaveCloudCompany","click", async () => {
-      const btn = $("btnSaveCloudCompany");
-      const status = $("cloudSaveStatus");
-      if (!btn || !status) return;
-
-      // Guard: only works when activeMode === "model" AND activeSheetKey === "company"
-      if (CTX.activeMode !== "model" || CTX.activeKey !== "company") {
-        status.textContent = "Company sheet only";
-        status.style.color = "#ef4444"; // red
-        return;
-      }
-
-      // Disable button and set saving state
-      btn.disabled = true;
-      btn.textContent = "Saving…";
-      status.textContent = "Saving…";
-      status.style.color = ""; // default color
-
-      try {
-        // Call cloud write function
-        const result = await (typeof window.cloudModelCompanyWriteOnce === "function"
-          ? window.cloudModelCompanyWriteOnce({ reason: "manual_save" })
-          : window.cloudModelCompanyWriteOnce());
-
-        if (result && result.ok) {
-          // Success: show "Saved ✓ HH:MM:SS"
-          const now = new Date();
-          const timeStr = now.toLocaleTimeString("en-US", { hour12: false, hour: "2-digit", minute: "2-digit", second: "2-digit" });
-          status.textContent = `Saved ✓ ${timeStr}`;
-          status.style.color = ""; // default color (not red)
-          console.log("[UI][SAVE][COMPANY] ok", { timestamp: now.toISOString() });
-        } else {
-          // Failure: show error message
-          const errorMsg = result?.error || result?.reason || "Unknown error";
-          status.textContent = `Save failed: ${errorMsg}`;
-          status.style.color = "#ef4444"; // red
-          console.log("[UI][SAVE][COMPANY] error", result);
-        }
-      } catch (err) {
-        // Catch any errors
-        const errorMsg = err?.message || String(err) || "Unknown error";
-        status.textContent = `Save failed: ${errorMsg}`;
-        status.style.color = "#ef4444"; // red
-        console.log("[UI][SAVE][COMPANY] error", err);
-      } finally {
-        // Restore button state
-        btn.disabled = false;
-        btn.textContent = "Save to Cloud";
-      }
-    });
   }
   // ======================= BLOCK: 03_BIND_TOOLBAR_EVENTS_END =======================
 
