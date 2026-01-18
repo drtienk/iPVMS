@@ -3,16 +3,6 @@ console.log("✅ [cloud_period_exchange_rate_write] loaded");
 
 // Expose global function for writing exchange_rate sheet to cloud
 window.cloudPeriodExchangeRateWriteNow = async function cloudPeriodExchangeRateWriteNow(reason) {
-  // DIAG: Log function entry
-  console.log("[DIAG][PERIOD_EXCHANGE_RATE][WRITE_TRIGGERED]", { 
-    reason: reason,
-    companyId: sessionStorage.getItem("companyId") || window.documentMeta?.companyId || "unknown",
-    sheetKey: "exchange_rate",
-    mode: window.activeMode || "unknown",
-    activeKey: window.activeKey || "unknown",
-    t: Date.now()
-  });
-
   try {
     // Preconditions
     if (!window.SB) {

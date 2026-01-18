@@ -61,24 +61,12 @@ window.syncCellChange = function syncCellChange(payload) {
       const mode = String(window.activeMode || info.mode || "").trim();
       const key = String(window.activeKey || info.key || "").trim();
       
-      // DIAG: Log all syncCellChange calls to see what we're getting
-      console.log("[DIAG][SYNC_ENTRY]", { 
-        mode: mode, 
-        key: key, 
-        activeMode: window.activeMode, 
-        activeKey: window.activeKey,
-        infoMode: info.mode,
-        infoKey: info.key,
-        t: Date.now()
-      });
-      
       // Debug log to verify state
       if (mode === "period" || key === "exchange_rate") {
         console.log("[SYNC][DEBUG] Period/exchange_rate check", { mode, key, activeMode: window.activeMode, activeKey: window.activeKey });
       }
       
       if (mode === "period" && key === "exchange_rate") {
-        console.log("[DIAG][PERIOD_EXCHANGE_RATE][CONDITION_MET]", { mode, key, t: Date.now() });
         const now = Date.now();
         const timeSinceLastWrite = now - __lastPeriodExchangeRateCloudWrite__;
         
