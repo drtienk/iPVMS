@@ -705,12 +705,13 @@ window._syncDelColBtnVisibility = _syncDelColBtnVisibility;
   // ======================= BLOCK: 05_CLOUD_SAVE_DELEGATE_START =======================
   // Bind cloud save button using event delegation on stable toolbar container
   window.bindCloudSaveDelegateOnce = function bindCloudSaveDelegateOnce() {
-    if (window.__cloudSaveDelegateBound) return;
-    window.__cloudSaveDelegateBound = true;
+    if (window.__saveDelegateBound) return;
+    window.__saveDelegateBound = true;
 
     const root = document.getElementById("toolbarRoot") || document.querySelector(".toolbar");
     if (!root) {
-      console.warn("[UI][SAVE][COMPANY] toolbar container not found, retrying...");
+      console.warn("[UI][SAVE] toolbar container not found, retrying...");
+      window.__saveDelegateBound = false; // Reset guard on retry
       setTimeout(bindCloudSaveDelegateOnce, 100);
       return;
     }
@@ -719,7 +720,7 @@ window._syncDelColBtnVisibility = _syncDelColBtnVisibility;
       const btn = e.target.closest("#btnSaveCloudCompany");
       if (!btn) return;
 
-      console.log("[UI][SAVE][COMPANY] trigger");
+      console.log("[UI][SAVE] trigger");
 
       const status = document.getElementById("cloudSaveStatus");
       if (!status) return;
@@ -749,12 +750,10 @@ window._syncDelColBtnVisibility = _syncDelColBtnVisibility;
         // Call appropriate cloud write function based on mode/sheet
         let result;
         if (activeMode === "model" && activeKey === "company") {
-          console.log("[UI][SAVE][COMPANY] trigger");
           result = await (typeof window.cloudModelCompanyWriteOnce === "function"
             ? window.cloudModelCompanyWriteOnce({ reason: "manual_save" })
             : window.cloudModelCompanyWriteOnce());
         } else if (activeMode === "period" && activeKey === "exchange_rate") {
-          console.log("[UI][SAVE][PERIOD][EXCHANGE_RATE] trigger");
           result = await (typeof window.cloudPeriodExchangeRateWriteOnce === "function"
             ? window.cloudPeriodExchangeRateWriteOnce({ reason: "manual_save" })
             : window.cloudPeriodExchangeRateWriteOnce());
@@ -803,7 +802,7 @@ window._syncDelColBtnVisibility = _syncDelColBtnVisibility;
       }
     });
 
-    console.log("[UI][SAVE][COMPANY] delegate_bound");
+    console.log("[UI][SAVE] delegate_bound");
   };
   // ======================= BLOCK: 05_CLOUD_SAVE_DELEGATE_END =======================
 
