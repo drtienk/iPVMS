@@ -1,6 +1,10 @@
 // === sync_entrypoint.js - Single sync entry point (LOG ONLY) ===
 console.log("✅ [sync_entrypoint] loaded");
 
+// Debounce guard for cloud write (Company only)
+let __lastCompanyCloudWrite__ = 0;
+const COMPANY_CLOUD_WRITE_DEBOUNCE_MS = 1500;
+
 // Define single sync entry function
 window.syncCellChange = function syncCellChange(payload) {
   try {
@@ -12,6 +16,40 @@ window.syncCellChange = function syncCellChange(payload) {
     
     // Log with exact prefix
     console.log("[SYNC][ENTRY]", info);
+    
+    // PART A: Wire cloud write for Model / Company
+    try {
+      const mode = String(info.mode || window.activeMode || "").trim();
+      const key = String(info.key || window.activeKey || "").trim();
+      
+      if (mode === "model" && key === "company") {
+        const now = Date.now();
+        const timeSinceLastWrite = now - __lastCompanyCloudWrite__;
+        
+        if (timeSinceLastWrite >= COMPANY_CLOUD_WRITE_DEBOUNCE_MS) {
+          __lastCompanyCloudWrite__ = now;
+          console.log("[SYNC][COMPANY][CLOUD_WRITE] trigger");
+          
+          // Trigger cloud write asynchronously (non-blocking)
+          if (typeof window.cloudModelCompanyWriteOnce === "function") {
+            window.cloudModelCompanyWriteOnce().catch(err => {
+              // Non-fatal: log only, don't throw
+              console.warn("[SYNC][COMPANY][CLOUD_WRITE] error (non-fatal):", err.message || err);
+            });
+          } else {
+            console.warn("[SYNC][COMPANY][CLOUD_WRITE] cloudModelCompanyWriteOnce not available");
+          }
+        } else {
+          console.log("[SYNC][COMPANY][CLOUD_WRITE] skip (debounce)", { 
+            timeSinceLastWrite, 
+            remaining: COMPANY_CLOUD_WRITE_DEBOUNCE_MS - timeSinceLastWrite 
+          });
+        }
+      }
+    } catch (cloudWriteErr) {
+      // Non-fatal: log only, don't block sync entry
+      console.warn("[SYNC][COMPANY][CLOUD_WRITE] trigger error (non-fatal):", cloudWriteErr.message || cloudWriteErr);
+    }
     
     return { ok: true, logged: true };
   } catch (err) {
