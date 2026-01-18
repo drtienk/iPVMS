@@ -42,6 +42,15 @@ window.DEFS.ROUTER = window.DEFS.ROUTER || {};
 
     // render the table
     if (typeof render === "function") render();
+
+    // Step 8: Trigger cloud read on entering Period/Exchange Rate sheet
+    if (activeMode === "period" && nextKey === "exchange_rate") {
+      setTimeout(() => {
+        if (typeof window.cloudPeriodExchangeRateTryReadOnce === "function") {
+          window.cloudPeriodExchangeRateTryReadOnce({ reason: "enter_sheet" });
+        }
+      }, 100);
+    }
   }
 
   function refreshUI(){
@@ -146,6 +155,15 @@ window.DEFS.ROUTER = window.DEFS.ROUTER || {};
 
       refreshUI();
       setActive(activeKey);
+
+      // Step 8: Trigger cloud read after period switch if landing on exchange_rate
+      if (activeMode === "period" && activeKey === "exchange_rate") {
+        setTimeout(() => {
+          if (typeof window.cloudPeriodExchangeRateTryReadOnce === "function") {
+            window.cloudPeriodExchangeRateTryReadOnce({ reason: "period_switch" });
+          }
+        }, 100);
+      }
     });
 
     on("periodSelect","change", () => {
