@@ -28,6 +28,48 @@ window.DEFS.SHEETS_CORE = window.DEFS.SHEETS_CORE || {};
     while (s.rowExplanations.length < Math.min(20, s.rows)) s.rowExplanations.push("");
   }
 
+  // ✅ Enforce single-row constraint for Period/exchange_rate
+  function applySheetRowLimit(sheetKey, mode, gridData) {
+    const m = (mode === "period") ? "period" : "model";
+    const map = (m === "period") ? ctx.PERIOD_DEF_MAP : ctx.MODEL_DEF_MAP;
+    const def = map?.[sheetKey];
+    
+    if (!def || !def.maxDataRows || !def.lockExtraRows) return;
+    if (m !== "period" || sheetKey !== "company") return; // Only for Period/exchange_rate
+    
+    const s = gridData?.[sheetKey];
+    if (!s) return;
+    
+    // Enforce maxDataRows: 1 (keep only row 0)
+    if (s.rows > 1) {
+      s.rows = 1;
+    }
+    
+    // Truncate data array to 1 row (row index 0)
+    if (Array.isArray(s.data)) {
+      if (s.data.length > 1) {
+        s.data = [s.data[0] || []];
+      }
+      // Ensure row 0 exists and has correct length
+      if (!Array.isArray(s.data[0])) {
+        s.data[0] = [];
+      }
+      while (s.data[0].length < s.cols) {
+        s.data[0].push("");
+      }
+      if (s.data[0].length > s.cols) {
+        s.data[0].length = s.cols;
+      }
+    } else {
+      s.data = [Array(s.cols).fill("")];
+    }
+    
+    // Ensure size helper if available
+    if (typeof window.ensureSize === "function") {
+      window.ensureSize(s);
+    }
+  }
+
   function _normHeader(v){
     return String(v || "").replace(/\s+/g, " ").trim();
   }
@@ -109,6 +151,9 @@ window.DEFS.SHEETS_CORE = window.DEFS.SHEETS_CORE || {};
         if (s.meta.dafDesc.length > s.cols) s.meta.dafDesc.length = s.cols;
         if (s.meta.dafEnt.length  > s.cols) s.meta.dafEnt.length  = s.cols;
       }
+      
+      // ✅ Enforce single-row constraint for Period/exchange_rate
+      applySheetRowLimit(k, mode, sheets);
     }
   }
 
@@ -146,5 +191,7 @@ window.DEFS.SHEETS_CORE = window.DEFS.SHEETS_CORE || {};
   window.DEFS.SHEETS_CORE.ensureRowExplanations = ensureRowExplanations;
   window.DEFS.SHEETS_CORE.applySheetDefsByModeAndTrim = applySheetDefsByModeAndTrim;
   window.DEFS.SHEETS_CORE.resetSheetsToBlankForMode = resetSheetsToBlankForMode;
+  window.DEFS.SHEETS_CORE.applySheetRowLimit = applySheetRowLimit;
+  window.applySheetRowLimit = applySheetRowLimit; // Global export for easy access
 
 })();

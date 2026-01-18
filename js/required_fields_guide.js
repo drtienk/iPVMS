@@ -1,20 +1,29 @@
 /* =========================================================
   MODULE: 12B_REQUIRED_FIELDS_GUIDE
   AREA: Model > Company Resource (key: cr) required columns UI
+        Period > Exchange Rate (key: company) required columns UI (row 0 only)
   RULE: Do NOT modify header text (no asterisk, no extra words)
 ========================================================= */
 (function requiredFieldsGuide(){
 
-  const TARGET_MODE = "model";
-  const TARGET_KEY  = "cr";
+  const TARGET_MODE_CR = "model";
+  const TARGET_KEY_CR  = "cr";
+  const TARGET_MODE_EX = "period";
+  const TARGET_KEY_EX  = "company";
 
-  const REQUIRED_HEADERS = new Set([
+  const REQUIRED_HEADERS_CR = new Set([
     "Resource Code",
     "Resource - Level 1",
     "Resource - Level 2",
     "Description",
     "A.C. or Value Object Type",
     "Resource Driver"
+  ]);
+
+  const REQUIRED_HEADERS_EX = new Set([
+    "Business Unit Currency",
+    "Company Currency",
+    "Exchange Rate"
   ]);
 
   function normalizeHeader(s){
@@ -26,7 +35,10 @@
   function getKey(){  try { return (typeof activeKey  !== "undefined") ? activeKey  : ""; } catch { return ""; } }
 
   function isTargetContext(){
-    return getMode() === TARGET_MODE && getKey() === TARGET_KEY;
+    const mode = getMode();
+    const key = getKey();
+    return (mode === TARGET_MODE_CR && key === TARGET_KEY_CR) ||
+           (mode === TARGET_MODE_EX && key === TARGET_KEY_EX);
   }
 
   function getRequiredColIndexes(){
@@ -34,11 +46,21 @@
     if (!s) return [];
     const headers = Array.isArray(s.headers) ? s.headers : [];
     const cols = Number(s.cols || 0);
+    const mode = getMode();
+    const key = getKey();
+
+    const requiredSet = (mode === TARGET_MODE_EX && key === TARGET_KEY_EX)
+      ? REQUIRED_HEADERS_EX
+      : (mode === TARGET_MODE_CR && key === TARGET_KEY_CR)
+        ? REQUIRED_HEADERS_CR
+        : null;
+
+    if (!requiredSet) return [];
 
     const idx = [];
     for (let c=0; c<cols; c++){
       const h = normalizeHeader(headers[c]);
-      if (REQUIRED_HEADERS.has(h)) idx.push(c);
+      if (requiredSet.has(h)) idx.push(c);
     }
     return idx;
   }
@@ -72,9 +94,19 @@
     tbody.querySelectorAll("td.req-col").forEach(td => td.classList.remove("req-col"));
     tbody.querySelectorAll("td.req-missing").forEach(td => td.classList.remove("req-missing"));
 
+    const mode = getMode();
+    const key = getKey();
+    // For Period/exchange_rate, only apply to row 0 (data row index 0, displayed as row 1)
+    const requiredRowIndexes = (mode === TARGET_MODE_EX && key === TARGET_KEY_EX) ? [0] : null;
+
     requiredCols.forEach(c => {
       const tds = tbody.querySelectorAll(`td[data-c="${c}"]`);
       tds.forEach(td => {
+        // If requiredRowIndexes is set, only apply to those rows
+        if (requiredRowIndexes) {
+          const r = Number(td.dataset.r);
+          if (!Number.isFinite(r) || !requiredRowIndexes.includes(r)) return;
+        }
         td.classList.add("req-col");
         const v = String(td.textContent || "").trim();
         if (v === "") td.classList.add("req-missing");
@@ -117,7 +149,15 @@
     if (!(td instanceof HTMLElement) || td.tagName !== "TD") return;
 
     const c = Number(td.dataset.c);
+    const r = Number(td.dataset.r);
     if (!Number.isFinite(c)) return;
+
+    const mode = getMode();
+    const key = getKey();
+    // For Period/exchange_rate, only apply to row 0
+    if (mode === TARGET_MODE_EX && key === TARGET_KEY_EX) {
+      if (!Number.isFinite(r) || r !== 0) return;
+    }
 
     const requiredCols = getRequiredColIndexes();
     if (!requiredCols.includes(c)) return;

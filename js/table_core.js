@@ -260,6 +260,18 @@ window.DEFS.TABLE_CORE = window.DEFS.TABLE_CORE || {};
           for (let c=0; c<block[r].length; c++) s.data[startR + r][startC + c] = block[r][c] ?? "";
         }
 
+        // ✅ Enforce single-row constraint for Period/exchange_rate after paste
+        const mode = _getActiveMode();
+        const key = _getActiveKey();
+        if (typeof window.applySheetRowLimit === "function") {
+          const sheets = (typeof ctx.sheets === "object" && ctx.sheets) 
+            ? ctx.sheets 
+            : (typeof window.sheets === "object" && window.sheets) 
+              ? window.sheets 
+              : {};
+          window.applySheetRowLimit(key, mode, sheets);
+        }
+
         const doRender = (typeof ctx.render === "function")
           ? ctx.render
           : (typeof window.render === "function" ? window.render : null);

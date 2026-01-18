@@ -345,7 +345,32 @@ window._syncDelColBtnVisibility = _syncDelColBtnVisibility;
     on("addRowBtn","click", () => {
       const s = activeSheet();
       if (!s) return;
-      s.rows += 1;
+      
+      // ✅ Enforce single-row constraint for Period/exchange_rate
+      const mode = _getActiveMode();
+      const key = _getActiveKey();
+      if (typeof window.applySheetRowLimit === "function") {
+        window.applySheetRowLimit(key, mode, CTX.sheets || window.sheets || {});
+      }
+      
+      // If sheet is Period/exchange_rate, prevent adding row
+      if (mode === "period" && key === "company") {
+        const def = _getDefMapByMode(mode)?.[key];
+        if (def?.maxDataRows === 1 && def?.lockExtraRows) {
+          // Already enforced by applySheetRowLimit, but ensure it stays at 1
+          s.rows = 1;
+        } else {
+          s.rows += 1;
+        }
+      } else {
+        s.rows += 1;
+      }
+      
+      // Re-enforce after potential increment
+      if (typeof window.applySheetRowLimit === "function") {
+        window.applySheetRowLimit(key, mode, CTX.sheets || window.sheets || {});
+      }
+      
       render();
       saveToLocalByMode(CTX.activeMode);
       syncDelColBtnVisibility();
