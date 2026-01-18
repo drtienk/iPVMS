@@ -2,7 +2,7 @@
 console.log("✅ [cloud_period_exchange_rate_write] loaded");
 
 // Expose global function for writing exchange_rate sheet to cloud
-window.cloudPeriodExchangeRateWriteOnce = async function cloudPeriodExchangeRateWriteOnce(opts) {
+window.cloudPeriodExchangeRateWriteNow = async function cloudPeriodExchangeRateWriteNow(reason) {
   try {
     // Preconditions
     if (!window.SB) {
@@ -85,7 +85,7 @@ window.cloudPeriodExchangeRateWriteOnce = async function cloudPeriodExchangeRate
       }
 
       // Success
-      console.log("[CLOUD][WRITE][PERIOD][EXCHANGE_RATE] ok id=" + cloudId);
+      console.log("[CLOUD][WRITE][PERIOD][EXCHANGE_RATE] ok", { id: cloudId });
 
       return { ok: true };
 
