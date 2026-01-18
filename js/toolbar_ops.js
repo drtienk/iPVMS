@@ -690,46 +690,14 @@ window._syncDelColBtnVisibility = _syncDelColBtnVisibility;
       } catch (err) { showErr(err); }
     });
 
-  }
-  // ======================= BLOCK: 03_BIND_TOOLBAR_EVENTS_END =======================
-
-
-  // ======================= BLOCK: 04_EXPORTS_START =======================
-  window.DEFS.TOOLBAR_OPS.bind = bind;
-  window.DEFS.TOOLBAR_OPS.bindToolbarEvents = bindToolbarEvents;
-
-  // ✅ 給其他模組呼叫：統一走我們的安全函式
-  window.DEFS.TOOLBAR_OPS.syncDelColBtnVisibility = syncDelColBtnVisibility;
-  // ======================= BLOCK: 04_EXPORTS_END =======================
-
-  // ======================= BLOCK: 05_CLOUD_SAVE_DELEGATE_START =======================
-  // Bind cloud save button using event delegation on stable toolbar container
-  window.bindCloudSaveDelegateOnce = function bindCloudSaveDelegateOnce() {
-    if (window.__cloudSaveDelegateBound) return;
-    window.__cloudSaveDelegateBound = true;
-
-    const root = document.getElementById("toolbarRoot") || document.querySelector(".toolbar");
-    if (!root) {
-      console.warn("[UI][SAVE][COMPANY] toolbar container not found, retrying...");
-      setTimeout(bindCloudSaveDelegateOnce, 100);
-      return;
-    }
-
-    root.addEventListener("click", async (e) => {
-      const btn = e.target.closest("#btnSaveCloudCompany");
-      if (!btn) return;
-
-      console.log("[UI][SAVE][COMPANY] trigger");
-
-      const status = document.getElementById("cloudSaveStatus");
-      if (!status) return;
-
-      // Get active mode and key using same pattern as toolbar_ops
-      const activeMode = (window.activeMode || "model").toLowerCase();
-      const activeKey = (window.activeKey || "company");
+    // Save to Cloud (Model / Company only)
+    on("btnSaveCloudCompany","click", async () => {
+      const btn = $("btnSaveCloudCompany");
+      const status = $("cloudSaveStatus");
+      if (!btn || !status) return;
 
       // Guard: only works when activeMode === "model" AND activeSheetKey === "company"
-      if (activeMode !== "model" || activeKey !== "company") {
+      if (CTX.activeMode !== "model" || CTX.activeKey !== "company") {
         status.textContent = "Company sheet only";
         status.style.color = "#ef4444"; // red
         return;
@@ -773,10 +741,17 @@ window._syncDelColBtnVisibility = _syncDelColBtnVisibility;
         btn.textContent = "Save to Cloud";
       }
     });
+  }
+  // ======================= BLOCK: 03_BIND_TOOLBAR_EVENTS_END =======================
 
-    console.log("[UI][SAVE][COMPANY] delegate_bound");
-  };
-  // ======================= BLOCK: 05_CLOUD_SAVE_DELEGATE_END =======================
+
+  // ======================= BLOCK: 04_EXPORTS_START =======================
+  window.DEFS.TOOLBAR_OPS.bind = bind;
+  window.DEFS.TOOLBAR_OPS.bindToolbarEvents = bindToolbarEvents;
+
+  // ✅ 給其他模組呼叫：統一走我們的安全函式
+  window.DEFS.TOOLBAR_OPS.syncDelColBtnVisibility = syncDelColBtnVisibility;
+  // ======================= BLOCK: 04_EXPORTS_END =======================
 
 })(); // end installToolbarOps IIFE
 
