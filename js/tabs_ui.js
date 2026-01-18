@@ -65,13 +65,6 @@ window.DEFS.TABS_UI = window.DEFS.TABS_UI || {};
       if (btnWrap.children.length > 0) {
         tabBar.appendChild(row);
       }
-
-      // HOTFIX: Remove legacy "Exchange Rate" span nodes without dataset.sheetKey
-      document.querySelectorAll("span").forEach(sp => {
-        if ((sp.textContent || "").trim() === "Exchange Rate" && !(sp.dataset && sp.dataset.sheetKey)) {
-          sp.remove();
-        }
-      });
     } else {
       // Model mode: Use existing TAB_CONFIG and TAB_GROUPS_MODEL
       const cfgMap = Object.fromEntries(TAB_CONFIG.map(tcfg => [tcfg.key, tcfg]));
