@@ -167,6 +167,27 @@ console.log("✅ [19] app_init loaded");
         console.warn("[app_init] cloud read hook error (non-fatal):", err.message);
       }
 
+      // ====== 7.6) Try cloud read once for Period/exchange_rate (after initial render) ======
+      try {
+        if (!window.__CLOUD_PERIOD_EXCHANGE_RATE_READ_ONCE__) {
+          const currentMode = window.activeMode || "model";
+          const currentKey = window.activeKey || "";
+          if (currentMode === "period" && currentKey === "exchange_rate") {
+            window.__CLOUD_PERIOD_EXCHANGE_RATE_READ_ONCE__ = true;
+            console.log("[DIAG][app_init] BEFORE scheduling cloudPeriodExchangeRateTryReadOnce", { mode: currentMode, key: currentKey });
+            if (typeof window.cloudPeriodExchangeRateTryReadOnce === "function") {
+              // Run asynchronously to not block init
+              setTimeout(() => {
+                console.log("[DIAG][app_init] INSIDE setTimeout, BEFORE calling cloudPeriodExchangeRateTryReadOnce");
+                window.cloudPeriodExchangeRateTryReadOnce?.();
+              }, 100);
+            }
+          }
+        }
+      } catch (err) {
+        console.warn("[app_init] cloud read hook error (Period/exchange_rate, non-fatal):", err.message);
+      }
+
       // ====== 8) 強制重新綁定 Check 按鈕（確保 click handler 一定接上） ======
       setTimeout(function forceBindCheckButton(){
         // ✅ DISABLED: Check binding handled in custom_rules.js
