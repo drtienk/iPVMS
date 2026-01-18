@@ -9,7 +9,7 @@ window.DEFS.MODE_STORAGE = window.DEFS.MODE_STORAGE || {};
   let ctx = {
     get companyScopeKey(){ return window.companyScopeKey?.() || "default"; },
     get activePeriod(){ return (window.activePeriod || sessionStorage.getItem("activePeriod") || "").trim(); },
-    get periodId(){ return (window.getActivePeriodId?.() || sessionStorage.getItem("periodId") || "").trim(); },
+    get periodId(){ return (window.getActivePeriodId?.() || "").trim(); },
   };
 
   function init(nextCtx){
@@ -23,23 +23,17 @@ window.DEFS.MODE_STORAGE = window.DEFS.MODE_STORAGE || {};
       return `miniExcel_autosave_model_v4__${scope}`;
     }
 
-    // Use periodId if available (Step 7), otherwise fallback to activePeriod (backward compatibility)
-    const periodId = ctx.periodId;
-    if (periodId) {
-      return `miniExcel_autosave_period_v1__${scope}__${periodId}`;
-    }
-
-    const p = (ctx.activePeriod || "").trim();
-    const safe = p ? p : "__NO_PERIOD__";
-    return `miniExcel_autosave_period_v4__${scope}__${safe}`;
+    // Use periodId (YYYY-MM format from activePeriod) for period mode
+    const periodId = ctx.periodId || ctx.activePeriod;
+    const safe = periodId ? String(periodId).trim() : "__NO_PERIOD__";
+    return `miniExcel_autosave_period_v1__${scope}__${safe}`;
   }
 
   function saveToLocalByMode(mode, sheetsObj) {
     try {
       if (mode === "period") {
-        const periodId = ctx.periodId;
         const activePeriod = ctx.activePeriod;
-        if (!periodId && !activePeriod) return;
+        if (!activePeriod) return;
       }
       localStorage.setItem(storageKeyByMode(mode), JSON.stringify(sheetsObj || {}));
     } catch (err) {
@@ -51,9 +45,8 @@ window.DEFS.MODE_STORAGE = window.DEFS.MODE_STORAGE || {};
   function loadFromLocalByMode(mode) {
     try {
       if (mode === "period") {
-        const periodId = ctx.periodId;
         const activePeriod = ctx.activePeriod;
-        if (!periodId && !activePeriod) return null;
+        if (!activePeriod) return null;
       }
       const raw = localStorage.getItem(storageKeyByMode(mode));
       return raw ? JSON.parse(raw) : null;
