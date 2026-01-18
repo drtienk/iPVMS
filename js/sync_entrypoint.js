@@ -57,14 +57,8 @@ window.syncCellChange = function syncCellChange(payload) {
 
     // PART B: Wire cloud write for Period / exchange_rate
     try {
-      // Use direct window state (same as Model/company check above)
-      const mode = String(window.activeMode || info.mode || "").trim();
-      const key = String(window.activeKey || info.key || "").trim();
-      
-      // Debug log to verify state
-      if (mode === "period" || key === "exchange_rate") {
-        console.log("[SYNC][DEBUG] Period/exchange_rate check", { mode, key, activeMode: window.activeMode, activeKey: window.activeKey });
-      }
+      const mode = String(info.mode || window.activeMode || "").trim();
+      const key = String(info.key || window.activeKey || "").trim();
       
       if (mode === "period" && key === "exchange_rate") {
         const now = Date.now();
@@ -75,13 +69,13 @@ window.syncCellChange = function syncCellChange(payload) {
           console.log("[SYNC][PERIOD][EXCHANGE_RATE][CLOUD_WRITE] trigger");
           
           // Trigger cloud write asynchronously (non-blocking)
-          if (typeof window.cloudPeriodExchangeRateWriteNow === "function") {
-            window.cloudPeriodExchangeRateWriteNow("syncCellChange").catch(err => {
+          if (typeof window.cloudPeriodExchangeRateWriteOnce === "function") {
+            window.cloudPeriodExchangeRateWriteOnce().catch(err => {
               // Non-fatal: log only, don't throw
               console.warn("[SYNC][PERIOD][EXCHANGE_RATE][CLOUD_WRITE] error (non-fatal):", err.message || err);
             });
           } else {
-            console.warn("[SYNC][PERIOD][EXCHANGE_RATE][CLOUD_WRITE] cloudPeriodExchangeRateWriteNow not available");
+            console.warn("[SYNC][PERIOD][EXCHANGE_RATE][CLOUD_WRITE] cloudPeriodExchangeRateWriteOnce not available");
           }
         } else {
           console.log("[SYNC][PERIOD][EXCHANGE_RATE][CLOUD_WRITE] skip (debounce)", { 
