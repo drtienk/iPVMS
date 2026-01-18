@@ -51,7 +51,6 @@ window.DEFS.TABS_UI = window.DEFS.TABS_UI || {};
         btn.id = tcfg.id;
         btn.type = "button";
         btn.className = "tab-btn";
-        btn.dataset.sheetKey = tcfg.key;
         btn.textContent = window.DEFS?.TABS?.tabLabel?.(tcfg) || tcfg.enModel;
 
         btn.addEventListener("click", () => {
