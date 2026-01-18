@@ -11,7 +11,6 @@ window.DEFS.TABS = window.DEFS.TABS || {};
 
 window.DEFS.TABS.TAB_CONFIG = [
   { id:"tabCompany", key:"company", enModel:"Company", zhModel:"公司", enPeriod:"Exchange Rate", zhPeriod:"匯率" },
-  { id:"tabExchangeRate", key:"exchange_rate", enModel:"Exchange Rate", zhModel:"匯率", enPeriod:"Exchange Rate", zhPeriod:"匯率", periodOnly:true },
   { id:"tabBU",      key:"bu",      enModel:"Business Unit", zhModel:"事業單位", enPeriod:"Resource", zhPeriod:"資源" },
   { id:"tabCR",      key:"cr",      enModel:"Company Resource", zhModel:"公司資源", enPeriod:"Resource Driver (Activity Center)", zhPeriod:"資源動因（作業中心）" },
   { id:"tabAC",      key:"ac",      enModel:"Activity Center", zhModel:"作業中心", enPeriod:"Resource Driver (Value Object)", zhPeriod:"資源動因（價值標的）" },
@@ -45,7 +44,7 @@ window.DEFS.TABS.TAB_GROUPS_MODEL = [
 ];
 
 window.DEFS.TABS.TAB_GROUPS_PERIOD = [
-  { labelEn: "Basic Info", labelZh: "基本資訊", keys: ["company", "exchange_rate"] },
+  { labelEn: "Basic Info", labelZh: "基本資訊", keys: ["company"] },
   { labelEn: "Module 1",   labelZh: "模組 1",   keys: ["bu", "cr", "ac", "nc"] },
   { labelEn: "Module 2",   labelZh: "模組 2",   keys: ["mach", "mat"] },
   { labelEn: "Module 3",   labelZh: "模組 3",   keys: ["pp", "prod", "cust"] },
