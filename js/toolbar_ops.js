@@ -728,15 +728,9 @@ window._syncDelColBtnVisibility = _syncDelColBtnVisibility;
       const activeMode = (window.activeMode || "model").toLowerCase();
       const activeKey = (window.activeKey || "company");
 
-      // Guard: Model/Company -> cloud save works; Period/Exchange Rate -> not available yet
-      if (activeMode === "model" && activeKey === "company") {
-        // Existing behavior - cloud save works
-      } else if (activeMode === "period" && activeKey === "exchange_rate") {
-        status.textContent = "Not available yet";
-        status.style.color = "#ef4444"; // red
-        return;
-      } else {
-        status.textContent = "Cloud save not enabled for this sheet";
+      // Guard: only works when activeMode === "model" AND activeSheetKey === "company"
+      if (activeMode !== "model" || activeKey !== "company") {
+        status.textContent = "Company sheet only";
         status.style.color = "#ef4444"; // red
         return;
       }

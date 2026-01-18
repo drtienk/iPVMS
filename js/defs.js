@@ -99,7 +99,6 @@ window.DEFS.MODEL_DEF_MAP= {
 
 window.DEFS.PERIOD_DEF_MAP = {
   company: { title:"Exchange Rate", headers:["Business Unit Currency","Company Currency","Exchange Rate"], cols:3 },
-  exchange_rate: { title:"Exchange Rate", headers:["From Currency","To Currency","Rate","As Of Date"], cols:4 },
   bu:      { title:"Resource", headers:["Business Unit","Resource Code","(Resource description)","Activity Center Code","(Activity center description)","Amount","Value Object Type","Value Object Code","Machine Code","Product Code"], cols:10 },
   cr:      { title:"Resource Driver (Activity Center)", headers:["Activity Center Code","(Activity Center)","Floor Space","Activity Center Headcount","Supervising Hours"], cols:5 },
   ac:      { title:"Resource Driver (Value Object)", headers:["Business Unit","Value Object Type","Value Object Code","Driver Code","Driver Value"], cols:5 },
