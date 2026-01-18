@@ -728,11 +728,13 @@ window._syncDelColBtnVisibility = _syncDelColBtnVisibility;
       const activeMode = (window.activeMode || "model").toLowerCase();
       const activeKey = (window.activeKey || "company");
 
-      // Guard: Model/Company -> cloud save works; Period/Exchange Rate -> cloud save works
+      // Guard: Model/Company -> cloud save works; Period/Exchange Rate -> not available yet
       if (activeMode === "model" && activeKey === "company") {
         // Existing behavior - cloud save works
       } else if (activeMode === "period" && activeKey === "exchange_rate") {
-        // Period/Exchange Rate cloud save - Step 8
+        status.textContent = "Not available yet";
+        status.style.color = "#ef4444"; // red
+        return;
       } else {
         status.textContent = "Cloud save not enabled for this sheet";
         status.style.color = "#ef4444"; // red
@@ -746,23 +748,10 @@ window._syncDelColBtnVisibility = _syncDelColBtnVisibility;
       status.style.color = ""; // default color
 
       try {
-        // Call appropriate cloud write function based on mode/sheet
-        let result;
-        if (activeMode === "model" && activeKey === "company") {
-          console.log("[UI][SAVE][COMPANY] trigger");
-          result = await (typeof window.cloudModelCompanyWriteOnce === "function"
-            ? window.cloudModelCompanyWriteOnce({ reason: "manual_save" })
-            : window.cloudModelCompanyWriteOnce());
-        } else if (activeMode === "period" && activeKey === "exchange_rate") {
-          console.log("[UI][SAVE][PERIOD][EXCHANGE_RATE] trigger");
-          result = await (typeof window.cloudPeriodExchangeRateWriteOnce === "function"
-            ? window.cloudPeriodExchangeRateWriteOnce({ reason: "manual_save" })
-            : window.cloudPeriodExchangeRateWriteOnce());
-        } else {
-          status.textContent = "Cloud save not enabled for this sheet";
-          status.style.color = "#ef4444"; // red
-          return;
-        }
+        // Call cloud write function
+        const result = await (typeof window.cloudModelCompanyWriteOnce === "function"
+          ? window.cloudModelCompanyWriteOnce({ reason: "manual_save" })
+          : window.cloudModelCompanyWriteOnce());
 
         if (result && result.ok) {
           // Success: show "Saved ✓ HH:MM:SS"
@@ -770,32 +759,20 @@ window._syncDelColBtnVisibility = _syncDelColBtnVisibility;
           const timeStr = now.toLocaleTimeString("en-US", { hour12: false, hour: "2-digit", minute: "2-digit", second: "2-digit" });
           status.textContent = `Saved ✓ ${timeStr}`;
           status.style.color = ""; // default color (not red)
-          if (activeMode === "model" && activeKey === "company") {
-            console.log("[UI][SAVE][COMPANY] ok", { timestamp: now.toISOString() });
-          } else if (activeMode === "period" && activeKey === "exchange_rate") {
-            console.log("[UI][SAVE][PERIOD][EXCHANGE_RATE] ok", { timestamp: now.toISOString() });
-          }
+          console.log("[UI][SAVE][COMPANY] ok", { timestamp: now.toISOString() });
         } else {
           // Failure: show error message
           const errorMsg = result?.error || result?.reason || "Unknown error";
           status.textContent = `Save failed: ${errorMsg}`;
           status.style.color = "#ef4444"; // red
-          if (activeMode === "model" && activeKey === "company") {
-            console.log("[UI][SAVE][COMPANY] error", result);
-          } else if (activeMode === "period" && activeKey === "exchange_rate") {
-            console.log("[UI][SAVE][PERIOD][EXCHANGE_RATE] error", result);
-          }
+          console.log("[UI][SAVE][COMPANY] error", result);
         }
       } catch (err) {
         // Catch any errors
         const errorMsg = err?.message || String(err) || "Unknown error";
         status.textContent = `Save failed: ${errorMsg}`;
         status.style.color = "#ef4444"; // red
-        if (activeMode === "model" && activeKey === "company") {
-          console.log("[UI][SAVE][COMPANY] error", err);
-        } else if (activeMode === "period" && activeKey === "exchange_rate") {
-          console.log("[UI][SAVE][PERIOD][EXCHANGE_RATE] error", err);
-        }
+        console.log("[UI][SAVE][COMPANY] error", err);
       } finally {
         // Restore button state
         btn.disabled = false;
